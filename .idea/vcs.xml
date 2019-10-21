@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Reference/AnoGAN" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Reference/ganomaly" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/Reference/mltrain-nips-2017" vcs="Git" />
+  </component>
+</project>

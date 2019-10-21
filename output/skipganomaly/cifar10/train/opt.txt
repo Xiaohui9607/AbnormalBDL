@@ -1,0 +1,45 @@
+------------ Options -------------
+abnormal_class: automobile
+batchsize: 64
+beta1: 0.5
+dataroot: 
+dataset: cifar10
+device: gpu
+display: False
+display_id: 0
+display_port: 8097
+display_server: http://localhost
+droplast: True
+extralayers: 0
+gpu_ids: []
+isTrain: True
+isize: 32
+iter: 0
+load_weights: False
+lr: 0.0002
+lr_decay_iters: 50
+lr_policy: lambda
+manualseed: -1
+metric: roc
+model: skipganomaly
+name: skipganomaly/cifar10
+nc: 3
+ndf: 64
+ngf: 64
+ngpu: 1
+niter: 15
+niter_decay: 100
+nz: 100
+outf: ./output
+path: 
+phase: train
+print_freq: 100
+resume: 
+save_image_freq: 100
+save_test_images: False
+verbose: False
+w_adv: 1
+w_con: 50
+w_lat: 1
+workers: 8
+-------------- End ----------------
