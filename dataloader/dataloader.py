@@ -60,7 +60,10 @@ def load_data(opt):
         train_ds, valid_ds = get_mnist_anomaly_dataset(train_ds, valid_ds, int(opt.abnormal_class))
 
     # FOLDER
-    else:
+
+
+    elif opt.dataset in ['OCT']:
+        # TODO: fix the OCT dataset into the dataloader and return
         transform = transforms.Compose([transforms.Resize(opt.isize),
                                         transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor(),
@@ -68,6 +71,9 @@ def load_data(opt):
 
         train_ds = ImageFolder(os.path.join(opt.dataroot, 'train'), transform)
         valid_ds = ImageFolder(os.path.join(opt.dataroot, 'test'), transform)
+
+    else:
+        raise NotImplementedError
 
     ## DATALOADER
     train_dl = DataLoader(dataset=train_ds, batch_size=opt.batchsize, shuffle=True, drop_last=True)
