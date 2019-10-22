@@ -2,3 +2,5 @@ Reference/*
 data/*
 .git/*
 .DS_Store/*
+.idea/*
+__pycache__/*
