@@ -45,7 +45,7 @@ class Options():
         self.parser.add_argument('--abnormal_class', default='automobile', help='Anomaly class idx for mnist and cifar datasets')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric.')
         self.parser.add_argument('--bayes', action='store_true', default=True, help='Drop last batch size.')
-        self.parser.add_argument('--n_MC_samples', type=int, default=1, help='number of sample parameters')
+        self.parser.add_argument('--n_MC_samples', type=int, default=10, help='number of sample parameters')
         self.parser.add_argument('--n_MC_parallel', type=int, default=1, help='get sample parameter in parallel')
 
 

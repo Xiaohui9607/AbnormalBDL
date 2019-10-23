@@ -1,7 +1,8 @@
 import torch
 from tqdm import tqdm
-from models.networks import Generator, Discriminator
+from models.statsutil import weight_init
 from dataloader.dataloader import load_data
+from models.networks import Generator, Discriminator
 
 
 class ANB:
@@ -14,23 +15,25 @@ class ANB:
         self.net_D = Discriminator(self.opt)
         self.optimizer_D = torch.optim.Adam(self.net_D.parameters(), lr=self.opt.lr)
 
-        net_G = Generator(self.opt)
-        optioptimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
+        # net_G = Generator(self.opt)
+        # optioptimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
 
-        self.net_Gs = [net_G]
-        self.optimizer_Gs = [optioptimizer_G]
+        self.net_Gs = []
+        self.optimizer_Gs = []
 
         # TODO: define likelihood loss function(discriminator), reconstruction loss, feat_loss
 
         if self.opt.bayes:
             # TODO: define the loss function (piror and noise) proposal by SGHMC
 
-            for _idxmc in range(1, self.opt.n_MC_samples):
-                net_G = Generator(self.opt)
+            batch_norm_layers = {}
+            for _idxmc in range(0, self.opt.n_MC_samples):
+                net_G = Generator(self.opt, batch_norm_layers=batch_norm_layers)
+                net_G.apply(weight_init)
                 optioptimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
                 self.net_Gs.append(net_G)
                 self.optimizer_Gs.append(optioptimizer_G)
-
+        pass
 
     def train_epoch(self):
         for data in tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train)):
