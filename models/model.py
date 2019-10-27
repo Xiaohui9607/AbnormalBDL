@@ -2,18 +2,20 @@ import torch
 import math
 from torch import nn
 from tqdm import tqdm
-from models.loss import lat_loss, noise_loss, prior_loss
-from models.utils import weights_init
+from collections import OrderedDict
+from utils.loss import lat_loss, noise_loss, prior_loss
+from utils import weights_init, Visualizer
 from dataloader.dataloader import load_data
 from models.networks import Generator, Discriminator
 
-
+torch.autograd.set_detect_anomaly(True)
 class ANB:
     def __init__(self, opt):
         self.opt = opt
         self.dataloader = load_data(opt)
         self.epoch = self.opt.niter
         self.data_size = len(self.dataloader.train) * self.opt.batchsize
+        self.visualizer = Visualizer(opt)
 
         # TODO: initialize network and optimizer
         self.net_D = Discriminator(self.opt)
@@ -22,7 +24,8 @@ class ANB:
         self.net_Gs = []
         self.optimizer_Gs = []
 
-        net_G = Generator(self.opt, batch_norm_layers={})
+        batch_norm_layers = {}
+        net_G = Generator(self.opt, batch_norm_layers=batch_norm_layers)
         optimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
 
         self.net_Gs.append(net_G)
@@ -31,7 +34,6 @@ class ANB:
         if self.opt.bayes:
             # TODO: define the loss function (piror and noise) proposal by SGHMC
             self.net_Gs[0].apply(weights_init)
-            batch_norm_layers = {}
             for _idxmc in range(1, self.opt.n_MC_samples):
                 net_G = Generator(self.opt, batch_norm_layers=batch_norm_layers)
                 # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
@@ -46,10 +48,10 @@ class ANB:
         self.l_lat = lat_loss(0.1)  # sigma is a hyperparamter, add it to parser later
 
         self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size)
-        self.l_g_noise = noise_loss(params=net_G.parameters(), scale=math.sqrt(2 * self.opt.gnoise_alpha / self.opt.lr), data_size=self.data_size)
+        self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.gnoise_alpha / self.opt.lr), data_size=self.data_size)
 
-    def train_epoch(self):
-        for x_real, _ in tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train)):
+    def train_epoch(self, i_epoch):
+        for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))):
             # TODO Discriminator optimize step
 
             self.net_D.zero_grad()
@@ -94,19 +96,44 @@ class ANB:
             # step1(b): Fake loss (gradient inverse, use label_real)
             err_g_fake = self.l_adv(pred_fakes, label_reals)
             # pretrain use reconstruction loss (strategy not confirm)
+
+            # step2: Fake reconstruction loss
             if True:
                 err_g_con = self.l_con(x_reals, x_fakes)
+
             err_g = err_g_fake + err_g_lat + err_g_con
-            # if self.opt.bayes:
-            #     for net_G in self.net_Gs:
-            #         err_g += self.l_g_noise(net_G.parameters()) + self.l_g_prior(net_G.parameters())
+
+            # do SGHMC for err_g_fake and err_g_lat
+            if self.opt.bayes:
+                for net_G in self.net_Gs:
+                    err_g += self.l_g_noise(net_G.parameters())
+                    err_g += self.l_g_prior(net_G.parameters())
             err_g.backward(retain_graph=True)
+            # optimize net_G
             for optimizer_G in self.optimizer_Gs:
                 optimizer_G.step()
-            # do SGHMC for err_g_fake and err_g_lat
 
+            # printing option
+            epoch_iter = iter * self.opt.batchsize
+            if epoch_iter % self.opt.print_freq == 0:
+                errors = OrderedDict([
+                    ('err_d', err_d),
+                    ('err_g', err_g),
+                    ('err_g_adv', err_d_fake),
+                    ('err_g_con', err_g_con),
+                    ('err_g_lat', err_g_lat)])
+                if self.opt.display:
+                    counter_ratio = float(epoch_iter) / len(self.dataloader.train.dataset)
+                    self.visualizer.plot_current_errors(i_epoch, counter_ratio, errors)
 
-            pass
+            if epoch_iter % self.opt.save_image_freq == 0:
+                reals, fakes = x_real, x_fakes
+
+                self.visualizer.save_current_images(i_epoch, reals, fakes)
+                if self.opt.display:
+                    self.visualizer.display_current_images(reals, fakes)
+
+        print(">> Training model . Epoch %d/%d" % (i_epoch + 1, self.opt.niter))
 
     def train(self):
         # for self.epoch in range(self.opt.iter, self.opt.niter):
@@ -122,4 +149,7 @@ class ANB:
         for net_G in self.net_Gs:
             net_G.train()
         for i in range(10):
-            self.train_epoch()
+            self.train_epoch(i)
+
+    # def get_current_images(self):
+    #     return (None, None, None)

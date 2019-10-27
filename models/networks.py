@@ -30,7 +30,7 @@ class Encoder(nn.Module):
         main.add_module('initial-conv-{0}-{1}'.format(nc, ndf),
                         nn.Conv2d(nc, ndf, 4, 2, 1, bias=False))
         main.add_module('initial-relu-{0}'.format(ndf),
-                        nn.LeakyReLU(0.2, inplace=True))
+                        nn.LeakyReLU(0.2, inplace=False))
         csize, cndf = isize / 2, ndf
         _idxbn = 0
         # Extra layers
@@ -42,7 +42,7 @@ class Encoder(nn.Module):
             main.add_module('extra-layers-{0}-{1}-batchnorm'.format(t, cndf),
                             batch_norm_layers['Encoder'][_idxbn])
             main.add_module('extra-layers-{0}-{1}-relu'.format(t, cndf),
-                            nn.LeakyReLU(0.2, inplace=True))
+                            nn.LeakyReLU(0.2, inplace=False))
             _idxbn += 1
 
         while csize > 4:
@@ -55,7 +55,7 @@ class Encoder(nn.Module):
             main.add_module('pyramid-{0}-batchnorm'.format(out_feat),
                             batch_norm_layers['Encoder'][_idxbn])
             main.add_module('pyramid-{0}-relu'.format(out_feat),
-                            nn.LeakyReLU(0.2, inplace=True))
+                            nn.LeakyReLU(0.2, inplace=False))
             cndf = cndf * 2
             csize = csize / 2
             _idxbn += 1
@@ -118,7 +118,7 @@ class Decoder(nn.Module):
         main.add_module('initial-{0}-batchnorm'.format(cngf),
                         batch_norm_layers['Decoder'][_idxbn])
         main.add_module('initial-{0}-relu'.format(cngf),
-                        nn.ReLU(True))
+                        nn.ReLU(False))
         _idxbn += 1
 
         csize, _ = 4, cngf
@@ -128,7 +128,7 @@ class Decoder(nn.Module):
             main.add_module('pyramid-{0}-batchnorm'.format(cngf // 2),
                             batch_norm_layers['Decoder'][_idxbn])
             main.add_module('pyramid-{0}-relu'.format(cngf // 2),
-                            nn.ReLU(True))
+                            nn.ReLU(False))
             cngf = cngf // 2
             csize = csize * 2
             _idxbn += 1
@@ -140,7 +140,7 @@ class Decoder(nn.Module):
             main.add_module('extra-layers-{0}-{1}-batchnorm'.format(t, cngf),
                             batch_norm_layers['Decoder'][_idxbn])
             main.add_module('extra-layers-{0}-{1}-relu'.format(t, cngf),
-                            nn.ReLU(True))
+                            nn.ReLU(False))
             _idxbn += 1
 
         main.add_module('final-{0}-{1}-convt'.format(cngf, nc),

@@ -4,15 +4,15 @@ from torch.autograd import Variable
 
 
 class noise_loss(torch.nn.Module):
-  # need the scale for noise standard deviation
-  # scale = noise  std
+    # need the scale for noise standard deviation
+    # scale = noise  std
     def __init__(self, params, scale=None, data_size=None):
         super(noise_loss, self).__init__()
         # initialize the distribution for each parameter
         #self.distributions = []
         self.noises = []
         for param in params:
-            noise = 0 * param.data # will fill with normal at each forward
+            noise = torch.zeros_like(param.data) # will fill with normal at each forward
             self.noises.append(noise)
         if scale is not None:
             self.scale = scale
@@ -21,8 +21,8 @@ class noise_loss(torch.nn.Module):
         self.data_size = data_size
 
     def forward(self, params, scale=None, data_size=None):
-    # scale should be sqrt(2*alpha/eta)
-    # where eta is the learning rate and alpha is the strength of drag term
+        # scale should be sqrt(2*alpha/eta)
+        # where eta is the learning rate and alpha is the strength of drag term
         if scale is None:
             scale = self.scale
         if data_size is None:
@@ -33,8 +33,8 @@ class noise_loss(torch.nn.Module):
         for noise, var in zip(self.noises, params):
             # This is scale * z^T*v
             # The derivative wrt v will become scale*z
-            _noise = noise.normal_(0,1)
-            noise_loss += scale*torch.sum(Variable(_noise)*var)
+            _noise = noise.normal_(0, 1).clone().detach()
+            noise_loss += scale * torch.sum(_noise * var)
         noise_loss /= data_size
         return noise_loss
 
