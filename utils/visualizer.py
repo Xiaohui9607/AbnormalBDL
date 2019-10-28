@@ -50,9 +50,9 @@ class Visualizer():
         # with open(self.log_name, "a") as log_file:
         #     now = time.strftime("%c")
         #     log_file.write('================ Training Loss (%s) ================\n' % now)
-        now  = time.strftime("%c")
+        now = time.strftime("%c")
         title = f'================ {now} ================\n'
-        info  = f'{opt.abnormal_class}, {opt.nz}, {opt.w_adv}, {opt.w_con}, {opt.w_lat}\n'
+        info = f'{opt.abnormal_class}, {opt.nz}, {opt.w_adv}, {opt.w_con}, {opt.w_lat}\n'
         self.write_to_log_file(text=title + info)
 
 
@@ -174,6 +174,7 @@ class Visualizer():
         fakes = self.normalize(fakes.cpu().numpy())
         # fixed = self.normalize(fixed.cpu().numpy())
 
+        # TODO change the method to: concat real + mc * fake image horizontally into 1 image and save
         self.vis.images(reals, win=1, opts={'title': 'Reals'})
         self.vis.images(fakes, win=2, opts={'title': 'Fakes'})
         # self.vis.images(fixed, win=3, opts={'title': 'Fixed'})
@@ -187,6 +188,7 @@ class Visualizer():
             fakes ([FloatTensor]): Fake Image
             fixed ([FloatTensor]): Fixed Fake Image
         """
+        # TODO change the method to: concat real + mc * fake image horizontally into 1 image and save
         vutils.save_image(reals, '%s/reals.png' % self.img_dir, normalize=True)
         vutils.save_image(fakes, '%s/fakes.png' % self.img_dir, normalize=True)
         # vutils.save_image(fixed, '%s/fixed_fakes_%03d.png' %(self.img_dir, epoch+1), normalize=True)

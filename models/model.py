@@ -8,7 +8,7 @@ from utils import weights_init, Visualizer
 from dataloader.dataloader import load_data
 from models.networks import Generator, Discriminator
 
-torch.autograd.set_detect_anomaly(True)
+
 class ANB:
     def __init__(self, opt):
         self.opt = opt
@@ -16,6 +16,7 @@ class ANB:
         self.epoch = self.opt.niter
         self.data_size = len(self.dataloader.train) * self.opt.batchsize
         self.visualizer = Visualizer(opt)
+        self.device = 'cpu' if self.opt.gpu_ids == '-1' else 'cuda: %s' % self.opt.gpu_ids
 
         # TODO: initialize network and optimizer
         self.net_D = Discriminator(self.opt)
@@ -128,11 +129,11 @@ class ANB:
 
             if epoch_iter % self.opt.save_image_freq == 0:
                 reals, fakes = x_real, x_fakes
-
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
 
+        # TODO save weight as mc sample
         print(">> Training model . Epoch %d/%d" % (i_epoch + 1, self.opt.niter))
 
     def train(self):
@@ -151,5 +152,4 @@ class ANB:
         for i in range(10):
             self.train_epoch(i)
 
-    # def get_current_images(self):
-    #     return (None, None, None)
+
