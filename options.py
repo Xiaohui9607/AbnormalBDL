@@ -45,8 +45,7 @@ class Options():
         self.parser.add_argument('--abnormal_class', default='0', help='Anomaly class idx for mnist and cifar datasets')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric.')
         self.parser.add_argument('--bayes', action='store_true', default=True, help='Drop last batch size.')
-        self.parser.add_argument('--n_MC_samples', type=int, default=10, help='number of sample parameters')
-        self.parser.add_argument('--n_MC_parallel', type=int, default=1, help='get sample parameter in parallel')
+        self.parser.add_argument('--n_MC_samples', type=int, default=1, help='number of sample parameters')
         self.parser.add_argument('--gnoise_alpha', type=float, default=0.0001, help='SGHMC friction and noise')
 
         ##
@@ -61,7 +60,7 @@ class Options():
         self.parser.add_argument('--niter', type=int, default=15, help='number of epochs to train for')
         self.parser.add_argument('--niter_decay', type=int, default=100, help='# of iter to linearly decay learning rate to zero')
         self.parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
-        self.parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate for adam')
+        self.parser.add_argument('--lr', type=float, default=0.002, help='initial learning rate for adam')
         self.parser.add_argument('--w_adv', type=float, default=1, help='Weight for adversarial loss. default=1')
         self.parser.add_argument('--w_con', type=float, default=50, help='Weight for reconstruction loss. default=50')
         self.parser.add_argument('--w_lat', type=float, default=1, help='Weight for latent space loss. default=1')

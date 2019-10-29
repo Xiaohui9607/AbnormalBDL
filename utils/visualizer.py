@@ -7,6 +7,7 @@ Returns:
 ##
 import os
 import time
+import torch
 import numpy as np
 import torchvision.utils as vutils
 
@@ -170,13 +171,15 @@ class Visualizer():
             fakes ([FloatTensor]): Fake Image
             fixed ([FloatTensor]): Fixed Fake Image
         """
-        reals = self.normalize(reals.cpu().numpy())
-        fakes = self.normalize(fakes.cpu().numpy())
+        o_img = torch.cat([reals, fakes])
+        self.normalize(o_img.cpu().numpy())
+        # reals = self.normalize(reals.cpu().numpy())
+        # fakes = self.normalize(fakes.cpu().numpy())
         # fixed = self.normalize(fixed.cpu().numpy())
 
         # TODO change the method to: concat real + mc * fake image horizontally into 1 image and save
-        self.vis.images(reals, win=1, opts={'title': 'Reals'})
-        self.vis.images(fakes, win=2, opts={'title': 'Fakes'})
+        self.vis.images(o_img, win=1, opts={'title': 'bar'})
+        # self.vis.images(fakes, win=2, opts={'title': 'Fakes'})
         # self.vis.images(fixed, win=3, opts={'title': 'Fixed'})
 
     def save_current_images(self, epoch, reals, fakes):
@@ -189,6 +192,8 @@ class Visualizer():
             fixed ([FloatTensor]): Fixed Fake Image
         """
         # TODO change the method to: concat real + mc * fake image horizontally into 1 image and save
-        vutils.save_image(reals, '%s/reals.png' % self.img_dir, normalize=True)
-        vutils.save_image(fakes, '%s/fakes.png' % self.img_dir, normalize=True)
+        o_img = torch.cat([reals, fakes])
+        vutils.save_image(o_img, '%s/img.png' % self.img_dir, normalize=True)
+        # vutils.save_image(reals, '%s/reals.png' % self.img_dir, normalize=True)
+        # vutils.save_image(fakes, '%s/fakes.png' % self.img_dir, normalize=True)
         # vutils.save_image(fixed, '%s/fixed_fakes_%03d.png' %(self.img_dir, epoch+1), normalize=True)

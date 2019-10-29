@@ -177,6 +177,7 @@ class Discriminator(nn.Module):
 
         self.features = nn.Sequential(*layers[:-1])
         self.classifier = nn.Sequential(layers[-1])
+        self.classifier.add_module('classifier', nn.Conv2d(1, 1, 3, 1, 1, bias=False))
         self.classifier.add_module('Sigmoid', nn.Sigmoid())
 
     def forward(self, x):

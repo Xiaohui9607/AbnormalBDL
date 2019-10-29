@@ -43,11 +43,12 @@ class ANB:
                 self.net_Gs.append(net_G)
                 self.optimizer_Gs.append(optimizer_G)
 
-        # TODO: define loss function
+        # TODO: define discriminator loss function
         self.l_adv = nn.BCELoss(reduction='mean')
         self.l_con = nn.L1Loss(reduction='mean')    # reduction = ?
         self.l_lat = lat_loss(0.1)  # sigma is a hyperparamter, add it to parser later
 
+        # TODO: define hmc loss
         self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size)
         self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.gnoise_alpha / self.opt.lr), data_size=self.data_size)
 
@@ -76,10 +77,10 @@ class ANB:
             # step2(a): Fake input feed foward
             pred_fakes, feat_fakes = self.net_D(x_fakes.detach())  # don't backprop net_G!
             # step2(cb: Fake loss
-            err_d_fake = self.l_adv(pred_fakes, label_fakes)
+            err_d_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_fakes)
 
             # step3: Latent feature loss
-            err_g_lat = self.l_lat(feat_reals, feat_fakes)
+            err_g_lat = self.opt.w_lat * self.l_lat(feat_reals, feat_fakes)
 
             # TODO: add SGHMC for Discriminative (or just pure discriminative loss)
             # step4: err summerize
@@ -95,12 +96,12 @@ class ANB:
             # step1(a): Fake input feed foward
             pred_fakes, _ = self.net_D(x_fakes)  # backprop net_G!
             # step1(b): Fake loss (gradient inverse, use label_real)
-            err_g_fake = self.l_adv(pred_fakes, label_reals)
+            err_g_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_reals)
             # pretrain use reconstruction loss (strategy not confirm)
 
             # step2: Fake reconstruction loss
             if True:
-                err_g_con = self.l_con(x_reals, x_fakes)
+                err_g_con = self.opt.w_con * self.l_con(x_reals, x_fakes)
 
             err_g = err_g_fake + err_g_lat + err_g_con
 
@@ -128,23 +129,16 @@ class ANB:
                     self.visualizer.plot_current_errors(i_epoch, counter_ratio, errors)
 
             if epoch_iter % self.opt.save_image_freq == 0:
-                reals, fakes = x_real, x_fakes
+                reals, fakes = x_real[:1], x_fakes[::self.opt.batchsize]
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
 
         # TODO save weight as mc sample
+
         print(">> Training model . Epoch %d/%d" % (i_epoch + 1, self.opt.niter))
 
     def train(self):
-        # for self.epoch in range(self.opt.iter, self.opt.niter):
-        #     self.train_one_epoch()
-        #     res = self.test()
-        #     if res['AUC'] > best_auc:
-        #         best_auc = res['AUC']
-        #         self.save_weights(self.epoch)
-        #     self.visualizer.print_current_performance(res, best_auc)
-        # print(">> Training model %s.[Done]" % self.name)
         self.net_D.train()
         # print(f">> Training {self.name} on {self.opt.dataset} to detect {self.opt.abnormal_class}")
         for net_G in self.net_Gs:
