@@ -50,8 +50,9 @@ class ANB:
 
         # TODO: define hmc loss
         if self.opt.bayes:
-            self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size)
-            self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.gnoise_alpha / self.opt.lr), data_size=self.data_size)
+            self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size*self.opt.n_MC_samples)
+            self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.gnoise_alpha / self.opt.lr),
+                                        data_size=self.data_size*self.opt.n_MC_samples)
 
     def train_epoch(self, i_epoch):
         '''
@@ -68,8 +69,9 @@ class ANB:
             x_fakes = []
             x_reals = []
             for net_G in self.net_Gs:
-                x_reals.append(x_real.clone())
-                x_fakes.append(net_G(x_real))
+                x_real_i = x_real.clone()
+                x_reals.append(x_real_i)
+                x_fakes.append(net_G(x_real_i))
             x_fakes = torch.cat(x_fakes, dim=0)
             x_reals = torch.cat(x_reals, dim=0)
             label_reals = torch.ones(x_reals.shape[0]).to(self.device)
@@ -100,14 +102,14 @@ class ANB:
             for net_G in self.net_Gs:
                 net_G.zero_grad()
             # step1(a): Fake input feed foward
-            pred_fakes, _ = self.net_D(x_fakes)  # backprop net_G!
+            pred_fakes, _ = self.net_D(x_fakes) # backprop net_G!
             # step1(b): Fake loss (gradient inverse, use label_real)
-            err_g_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_reals)
+            err_g_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_reals) * self.opt.n_MC_samples
             # pretrain use reconstruction loss (strategy not confirm)
 
             # step2: Fake reconstruction loss
             if True:
-                err_g_con = self.opt.w_con * self.l_con(x_reals, x_fakes)
+                err_g_con = self.opt.w_con * self.l_con(x_reals, x_fakes) * self.opt.n_MC_samples
 
             err_g = err_g_fake + err_g_lat + err_g_con
 
