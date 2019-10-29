@@ -16,17 +16,17 @@ class ANB:
         self.epoch = self.opt.niter
         self.data_size = len(self.dataloader.train) * self.opt.batchsize
         self.visualizer = Visualizer(opt)
-        self.device = 'cpu' if self.opt.gpu_ids == '-1' else 'cuda: %s' % self.opt.gpu_ids
+        self.device = 'cpu' if self.opt.gpu_ids == '-1' else 'cuda'
 
         # TODO: initialize network and optimizer
-        self.net_D = Discriminator(self.opt)
+        self.net_D = Discriminator(self.opt).to(self.device)
         self.optimizer_D = torch.optim.Adam(self.net_D.parameters(), lr=self.opt.lr)
 
         self.net_Gs = []
         self.optimizer_Gs = []
 
-        batch_norm_layers = {}
-        net_G = Generator(self.opt, batch_norm_layers=batch_norm_layers)
+        # batch_norm_layers = {}
+        net_G = Generator(self.opt, batch_norm_layers={}).to(self.device)
         optimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
 
         self.net_Gs.append(net_G)
@@ -36,7 +36,7 @@ class ANB:
             # TODO: define the loss function (piror and noise) proposal by SGHMC
             self.net_Gs[0].apply(weights_init)
             for _idxmc in range(1, self.opt.n_MC_samples):
-                net_G = Generator(self.opt, batch_norm_layers=batch_norm_layers)
+                net_G = Generator(self.opt, batch_norm_layers={}).to(self.device)
                 # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
                 net_G.apply(weights_init)
                 optimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
@@ -46,33 +46,39 @@ class ANB:
         # TODO: define discriminator loss function
         self.l_adv = nn.BCELoss(reduction='mean')
         self.l_con = nn.L1Loss(reduction='mean')    # reduction = ?
-        self.l_lat = lat_loss(0.1)  # sigma is a hyperparamter, add it to parser later
+        self.l_lat = lat_loss(0.1, reduction='mean')  # sigma is a hyperparamter, add it to parser later
 
         # TODO: define hmc loss
-        self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size)
-        self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.gnoise_alpha / self.opt.lr), data_size=self.data_size)
+        if self.opt.bayes:
+            self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size)
+            self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.gnoise_alpha / self.opt.lr), data_size=self.data_size)
 
     def train_epoch(self, i_epoch):
+        '''
+        problem 1: n_mc_sample > 1 will mess up (solved)
+        problem 2: original code add the err_g_lat to optimize the generator, but it's meaningless!
+        problem 3: when to stop the reconstruction loss backward, can not allow it dominate all the time (no uncertainty)
+        '''
         for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))):
             # TODO Discriminator optimize step
 
             self.net_D.zero_grad()
-
+            x_real = x_real.to(self.device)
             # Generate fake input(proposal1 —— uncertainty applies in the generator parameters)
             x_fakes = []
             x_reals = []
             for net_G in self.net_Gs:
-                x_reals.append(x_real)
+                x_reals.append(x_real.clone())
                 x_fakes.append(net_G(x_real))
             x_fakes = torch.cat(x_fakes, dim=0)
             x_reals = torch.cat(x_reals, dim=0)
-            label_reals = torch.ones(x_reals.shape[0])
-            label_fakes = torch.zeros(x_reals.shape[0])
+            label_reals = torch.ones(x_reals.shape[0]).to(self.device)
+            label_fakes = torch.zeros(x_reals.shape[0]).to(self.device)
 
             # step1(a): Real input feed foward
             pred_reals, feat_reals = self.net_D(x_reals)
             # step1(b): Real loss
-            err_d_real = self.l_adv(pred_reals, label_reals)
+            err_d_real = self.opt.w_adv * self.l_adv(pred_reals, label_reals)
 
             # step2(a): Fake input feed foward
             pred_fakes, feat_fakes = self.net_D(x_fakes.detach())  # don't backprop net_G!
@@ -109,6 +115,7 @@ class ANB:
             if self.opt.bayes:
                 for net_G in self.net_Gs:
                     err_g += self.l_g_noise(net_G.parameters())
+
                     err_g += self.l_g_prior(net_G.parameters())
             err_g.backward(retain_graph=True)
             # optimize net_G
@@ -129,7 +136,7 @@ class ANB:
                     self.visualizer.plot_current_errors(i_epoch, counter_ratio, errors)
 
             if epoch_iter % self.opt.save_image_freq == 0:
-                reals, fakes = x_real[:1], x_fakes[::self.opt.batchsize]
+                reals, fakes = x_real[0:1], x_fakes[0::self.opt.batchsize]
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)

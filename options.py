@@ -31,7 +31,7 @@ class Options():
         self.parser.add_argument('--ndf', type=int, default=64)
         self.parser.add_argument('--extralayers', type=int, default=0, help='Number of extra layers on gen and disc')
         self.parser.add_argument('--device', type=str, default='gpu', help='Device: gpu | cpu')
-        self.parser.add_argument('--gpu_ids', type=str, default='-1', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        self.parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self.parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
         self.parser.add_argument('--name', type=str, default='experiment_name', help='name of the experiment')
         self.parser.add_argument('--model', type=str, default='skipganomaly', help='chooses which model to use. ganomaly')
@@ -45,7 +45,7 @@ class Options():
         self.parser.add_argument('--abnormal_class', default='0', help='Anomaly class idx for mnist and cifar datasets')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric.')
         self.parser.add_argument('--bayes', action='store_true', default=True, help='Drop last batch size.')
-        self.parser.add_argument('--n_MC_samples', type=int, default=1, help='number of sample parameters')
+        self.parser.add_argument('--n_MC_samples', type=int, default=2, help='number of sample parameters')
         self.parser.add_argument('--gnoise_alpha', type=float, default=0.0001, help='SGHMC friction and noise')
 
         ##

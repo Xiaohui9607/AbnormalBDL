@@ -13,18 +13,18 @@ display_server: http://localhost
 droplast: True
 extralayers: 0
 gnoise_alpha: 0.0001
-gpu_ids: []
+gpu_ids: [0]
 isTrain: True
 isize: 32
 iter: 0
 load_weights: False
-lr: 0.0002
+lr: 0.002
 lr_decay_iters: 50
 lr_policy: lambda
 manualseed: -1
 metric: roc
 model: skipganomaly
-n_MC_samples: 1
+n_MC_samples: 2
 name: skipganomaly/mnist
 nc: 1
 ndf: 64
@@ -40,9 +40,9 @@ print_freq: 100
 resume: 
 save_image_freq: 100
 save_test_images: False
-verbose: True
+verbose: False
 w_adv: 1
-w_con: 20
+w_con: 50
 w_lat: 1
 workers: 8
 -------------- End ----------------
