@@ -67,9 +67,9 @@ class con_loss(nn.Module):
 
     def forward(self, x, target):
         if self.reduction == 'mean':
-            return torch.mean(x-target) / self.b
+            return torch.mean(torch.abs(x-target)) / self.b
         else:
-            return (x-target) / self.b
+            return torch.abs(x-target) / self.b
 
 
 class lat_loss(nn.Module):
