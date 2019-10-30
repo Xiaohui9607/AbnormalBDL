@@ -4,6 +4,7 @@ import torch
 
 # pylint: disable=C0103,C0301,R0903,W0622
 
+
 class Options():
     """Options class
 
@@ -31,7 +32,7 @@ class Options():
         self.parser.add_argument('--ndf', type=int, default=64)
         self.parser.add_argument('--extralayers', type=int, default=0, help='Number of extra layers on gen and disc')
         self.parser.add_argument('--device', type=str, default='gpu', help='Device: gpu | cpu')
-        self.parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        self.parser.add_argument('--gpu_ids', type=str, default='-1', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self.parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
         self.parser.add_argument('--name', type=str, default='experiment_name', help='name of the experiment')
         self.parser.add_argument('--model', type=str, default='skipganomaly', help='chooses which model to use. ganomaly')
@@ -61,9 +62,12 @@ class Options():
         self.parser.add_argument('--niter_decay', type=int, default=100, help='# of iter to linearly decay learning rate to zero')
         self.parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
         self.parser.add_argument('--lr', type=float, default=0.002, help='initial learning rate for adam')
+
+        self.parser.add_argument('--sigma_lat', type=float, default=1, help='Weight for reconstruction loss. default=1')
+        self.parser.add_argument('--scale_con', type=float, default=0.02, help='Weight for latent space loss. default=0.02')
         self.parser.add_argument('--w_adv', type=float, default=1, help='Weight for adversarial loss. default=1')
-        self.parser.add_argument('--w_con', type=float, default=50, help='Weight for reconstruction loss. default=50')
-        self.parser.add_argument('--w_lat', type=float, default=1, help='Weight for latent space loss. default=1')
+        # self.parser.add_argument('--w_con', type=float, default=50, help='Weight for reconstruction loss. default=50')
+        # self.parser.add_argument('--w_lat', type=float, default=1, help='Weight for latent space loss. default=1')
         self.parser.add_argument('--lr_policy', type=str, default='lambda', help='lambda|step|plateau')
         self.parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
         self.isTrain = True

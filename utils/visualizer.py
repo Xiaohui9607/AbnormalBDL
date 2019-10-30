@@ -48,13 +48,14 @@ class Visualizer():
         # --
         # Log file.
         self.log_name = os.path.join(opt.outf, opt.name, 'loss_log.txt')
-        # with open(self.log_name, "a") as log_file:
+        # with open(self.log_name, "w") as log_file:
         #     now = time.strftime("%c")
         #     log_file.write('================ Training Loss (%s) ================\n' % now)
         now = time.strftime("%c")
         title = f'================ {now} ================\n'
-        info = f'{opt.abnormal_class}, {opt.nz}, {opt.w_adv}, {opt.w_con}, {opt.w_lat}\n'
-        self.write_to_log_file(text=title + info)
+        info = f'abnormal class: {opt.abnormal_class}, n_z: {opt.nz}, ' \
+               f'w_adv: {opt.w_adv}, scale_con: {opt.scale_con}, sigma_lat: {opt.sigma_lat}\n'
+        self.write_to_log_file(text=title + info, mode='w')
 
 
     ##
@@ -141,8 +142,8 @@ class Visualizer():
             log_file.write('%s\n' % message)
 
     ##
-    def write_to_log_file(self, text):
-        with open(self.log_name, "a") as log_file:
+    def write_to_log_file(self, text, mode='a'):
+        with open(self.log_name, mode) as log_file:
             log_file.write('%s\n' % text)
 
     ##

@@ -56,6 +56,22 @@ class prior_loss(torch.nn.Module):
         return prior_loss
 
 
+class con_loss(nn.Module):
+    def __init__(self, b, reduction='mean'):
+        super(con_loss, self).__init__()
+        self.b = torch.tensor(b)
+        if reduction in ['sum', 'mean']:
+            self.reduction = reduction
+        else:
+            raise KeyError
+
+    def forward(self, x, target):
+        if self.reduction == 'mean':
+            return torch.mean(x-target) / self.b
+        else:
+            return (x-target) / self.b
+
+
 class lat_loss(nn.Module):
     def __init__(self, sigma, reduction='mean'):
         super(lat_loss, self).__init__()
@@ -67,6 +83,6 @@ class lat_loss(nn.Module):
 
     def forward(self, x, target):
         if self.reduction == 'mean':
-            return torch.mean(torch.pow(x-target, 2)) * torch.pow(self.sigma, 2)
+            return torch.mean(torch.pow(x-target, 2)) * 1/torch.pow(self.sigma, 2)
         else:
-            return torch.pow(x-target, 2) * torch.pow(self.sigma, 2)
+            return torch.pow(x-target, 2) * 1/torch.pow(self.sigma, 2)
