@@ -15,7 +15,7 @@ extralayers: 0
 gnoise_alpha: 0.0001
 gpu_ids: []
 isTrain: True
-isize: 32
+isize: 28
 iter: 0
 load_weights: False
 lr: 0.002
@@ -40,9 +40,9 @@ print_freq: 100
 resume: 
 save_image_freq: 100
 save_test_images: False
+scale_con: 0.02
+sigma_lat: 1
 verbose: False
 w_adv: 1
-w_con: 50
-w_lat: 1
 workers: 8
 -------------- End ----------------

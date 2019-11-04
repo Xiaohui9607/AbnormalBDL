@@ -67,6 +67,7 @@ class ANB:
         problem 1: n_mc_sample > 1 will mess up (solved)
         problem 2: original code add the err_g_lat to optimize the generator, but it's meaningless!
         problem 3: when to stop the reconstruction loss backward, can not allow it dominate all the time (no uncertainty)
+        problem 4: shuffle the batch for each model in parallel
         '''
         for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))):
             # TODO Discriminator optimize step
