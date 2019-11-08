@@ -15,7 +15,7 @@ extralayers: 0
 gnoise_alpha: 0.0001
 gpu_ids: []
 isTrain: True
-isize: 28
+isize: 32
 iter: 0
 load_weights: False
 lr: 0.002

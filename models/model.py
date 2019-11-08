@@ -20,9 +20,10 @@ from utils.loss import lat_loss, con_loss, noise_loss, prior_loss
 class ANB:
     def __init__(self, opt):
         self.opt = opt
-        self.dataloader = load_data(opt)
+        # self.dataloader = load_data(opt)
+        self.dataloaders = [load_data(opt) for _ in range(self.opt.n_MC_samples)]
         self.epoch = self.opt.niter
-        self.data_size = len(self.dataloader.train) * self.opt.batchsize  
+        self.data_size = len(self.dataloaders[0].train) * self.opt.batchsize
         self.visualizer = Visualizer(opt)
         self.device = 'cpu' if not self.opt.gpu_ids else 'cuda'
 
@@ -70,25 +71,22 @@ class ANB:
         problem 3: when to stop the reconstruction loss backward, can not allow it dominate all the time (no uncertainty)
         problem 4: shuffle the batch for each model in parallel (solved)
         '''
-        stack_of_reals = []
-        for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))): 
-        	stack_of_reals.append(x_real)
 
-        for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))): 
+        for _iter in tqdm(range(len(self.dataloaders[0].train))):
+
+            # TODO load n_MC * batch sample from n_MC dataloader
+            x_reals = []
+            x_fakes = []
+            for idx_mc in range(self.opt.n_MC_samples):
+                x_real, _ = next(iter(self.dataloaders[idx_mc].train))
+                x_fake = self.net_Gs[idx_mc](x_real)
+                x_reals.append(x_real)
+                x_fakes.append(x_fake)
+            x_reals = torch.cat(x_reals, dim=0)
+            x_fakes = torch.cat(x_fakes, dim=0)
             # TODO Discriminator optimize step
 
             self.net_D.zero_grad()
-            x_real = x_real.to(self.device)
-            # Generate fake input(proposal1 —— uncertainty applies in the generator parameters)
-            x_fakes = []
-            x_reals = []
-            for net_G in self.net_Gs:
-            	random_index = random.randint(0,len(stack_of_reals)-1)
-                x_real_i = stack_of_reals[random_index].clone() #x_real_i = x_real.clone()
-                x_reals.append(x_real_i)
-                x_fakes.append(net_G(x_real_i))
-            x_fakes = torch.cat(x_fakes, dim=0)
-            x_reals = torch.cat(x_reals, dim=0)
             label_reals = torch.ones(x_reals.shape[0]).to(self.device)
             label_fakes = torch.zeros(x_reals.shape[0]).to(self.device)
 
@@ -99,7 +97,7 @@ class ANB:
 
             # step2(a): Fake input feed foward
             pred_fakes, feat_fakes = self.net_D(x_fakes.detach())  # don't backprop net_G!
-            # step2(cb: Fake loss
+            # step2(cb): Fake loss
             err_d_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_fakes)
 
             # step3: Latent feature loss
@@ -140,7 +138,7 @@ class ANB:
                 optimizer_G.step()
 
             # printing option
-            epoch_iter = iter * self.opt.batchsize
+            epoch_iter = _iter * self.opt.batchsize
             if epoch_iter % self.opt.print_freq == 0:
                 errors = OrderedDict([
                     ('err_d', err_d),
@@ -149,11 +147,11 @@ class ANB:
                     ('err_g_con', err_g_con),
                     ('err_g_lat', err_g_lat)])
                 if self.opt.display:
-                    counter_ratio = float(epoch_iter) / len(self.dataloader.train.dataset)
+                    counter_ratio = float(epoch_iter) / len(self.dataloaders[0].train.dataset)
                     self.visualizer.plot_current_errors(i_epoch, counter_ratio, errors)
 
             if epoch_iter % self.opt.save_image_freq == 0:
-                reals, fakes = x_real[0:1], x_fakes[0::self.opt.batchsize]
+                reals, fakes = x_reals[0::self.opt.batchsize], x_fakes[0::self.opt.batchsize]
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
@@ -276,4 +274,5 @@ class ANB:
 
     def load_weight(self, pathlist:dict):
         pass
+
 

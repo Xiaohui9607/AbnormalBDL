@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.autograd import Variable
 
-
+# sum
 class noise_loss(torch.nn.Module):
     # need the scale for noise standard deviation
     # scale = noise  std
@@ -38,7 +38,7 @@ class noise_loss(torch.nn.Module):
         noise_loss /= data_size
         return noise_loss
 
-
+# mean
 class prior_loss(torch.nn.Module):
     # negative log Gaussian prior
     def __init__(self, prior_std=1., data_size=None):
