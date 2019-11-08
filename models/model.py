@@ -2,6 +2,7 @@ import os
 import math
 import time
 import torch
+import random
 import numpy as np
 import pandas as pd
 from torch import nn
@@ -69,6 +70,10 @@ class ANB:
         problem 3: when to stop the reconstruction loss backward, can not allow it dominate all the time (no uncertainty)
         problem 4: shuffle the batch for each model in parallel (solved)
         '''
+        stack_of_reals = []
+        for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))): 
+        	stack_of_reals.append(x_real)
+
         for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))): 
             # TODO Discriminator optimize step
 
@@ -78,7 +83,8 @@ class ANB:
             x_fakes = []
             x_reals = []
             for net_G in self.net_Gs:
-                x_real_i = x_real.clone()
+            	random_index = random.randint(0,len(stack_of_reals)-1)
+                x_real_i = stack_of_reals[random_index].clone() #x_real_i = x_real.clone()
                 x_reals.append(x_real_i)
                 x_fakes.append(net_G(x_real_i))
             x_fakes = torch.cat(x_fakes, dim=0)
