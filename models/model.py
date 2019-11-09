@@ -23,7 +23,7 @@ class ANB:
         self.dataloader = load_data(opt)
         # self.dataloaders = [load_data(opt) for _ in range(self.opt.n_MC_samples)]
         self.epoch = self.opt.niter
-        self.data_size = len(self.dataloaders[0].train) * self.opt.batchsize
+        self.data_size = len(self.dataloader.train) * self.opt.batchsize
         self.visualizer = Visualizer(opt)
         self.device = 'cpu' if not self.opt.gpu_ids else 'cuda'
 
@@ -44,7 +44,7 @@ class ANB:
 
         g_lr = self.opt.lr * self.opt.n_MC_Gen
 
-        net_G = Generator(self.opt, batch_norm_layers={}).to(self.device)
+        net_G = Generator(self.opt).to(self.device)
         optimizer_G = torch.optim.SGD(net_G.parameters(), lr=g_lr)
 
         self.net_Gs.append(net_G)
@@ -54,7 +54,7 @@ class ANB:
             # TODO: define the loss function (piror and noise) proposal by SGHMC
             self.net_Gs[0].apply(weights_init)
             for _idxmc in range(1, self.opt.n_MC_Gen):
-                net_G = Generator(self.opt, batch_norm_layers={}).to(self.device)
+                net_G = Generator(self.opt).to(self.device)
                 # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
                 net_G.apply(weights_init)
                 optimizer_G = torch.optim.SGD(net_G.parameters(), lr=g_lr)
@@ -95,7 +95,11 @@ class ANB:
         '''
         # for _iter in tqdm(range(len(self.dataloaders[0].train))):
         for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))):
-
+            errors = OrderedDict([
+                ('err_d', []),
+                ('err_g', []),
+                ('err_g_con', []),
+                ('err_g_lat', [])])
             for _idxD in range(self.opt.n_MC_Disc):
                 # TODO update each disc with all gens
                 self.net_Ds[_idxD].zero_grad()
@@ -104,17 +108,16 @@ class ANB:
                 err_d_real = self.l_adv(pred_real, label_real)
                 # err_d_real = self.opt.w_adv * self.l_adv(pred_reals, label_reals)
                 err_d_fakes = []
-                err_g_lat = []  # do we need to update latent feature loss in D?
+                # err_g_lat = []  # do we need to update latent feature loss in D?
                 for _idxG in range(self.opt.n_MC_Gen):
                     x_fake = self.net_Gs[_idxG](x_real)
                     pred_fake, feat_fake = self.net_Ds[_idxD](x_fake.detach())
                     label_fake = torch.zeros(x_real.shape[0]).to(self.device)
-
                     err_d_fake = self.l_adv(pred_fake, label_fake)
                     err_d_fakes.append(err_d_fake)
 
                 # err_g_lat = self.l_lat(feat_real, feat_fake)  # do we need to update latent feature loss in D?
-                err_d_total_loss = torch.tensor(0).to(self.device)
+                err_d_total_loss = torch.tensor(0, dtype=torch.float32).to(self.device)
                 for err_d_fake in err_d_fakes:
                     err_d_loss = err_d_fake + err_d_real
                     if self.opt.bayes:
@@ -123,6 +126,7 @@ class ANB:
                 err_d_total_loss /= self.opt.n_MC_Gen
                 err_d_total_loss.backward()
                 self.optimizer_Ds[_idxD].step()
+                errors['err_d'].append(err_d_total_loss.detach())
 
             for _idxG in range(self.opt.n_MC_Gen):
                 self.net_Gs[_idxG].zero_grad()
@@ -145,9 +149,11 @@ class ANB:
                     err_g_lat = self.l_lat(feat_real, feat_fake)
                     err_g_lats.append(err_g_lat)
 
-                err_g_total_loss = torch.tensor(0).to(self.device)
+                err_g_total_loss = torch.tensor(0, dtype=torch.float32).to(self.device)
+                err_g_total_lat = torch.tensor(0, dtype=torch.float32).to(self.device)
                 for err_g_fake, err_g_lat in zip(err_g_fakes, err_g_lats):
                     err_g_loss = err_g_fake + err_g_lat
+                    err_g_total_lat += err_g_lat
                     if self.opt.bayes:
                         err_g_loss += self.l_g_noise(self.net_Gs[_idxG].parameters()) + self.l_g_prior(self.net_Gs[_idxG].parameters())
                     err_g_total_loss += err_g_loss
@@ -156,20 +162,20 @@ class ANB:
                 err_g_total_loss.backward()
                 self.optimizer_Gs[_idxG].step()
 
+                err_g_total_lat /= self.opt.n_MC_Disc
+
+                errors['err_g'].append(err_g_total_loss.detach())
+                errors['err_g_lat'].append(err_g_total_lat.detach())
+                errors['err_g_con'].append(err_g_con.detach())
+
             epoch_iter = iter * self.opt.batchsize
             if epoch_iter % self.opt.print_freq == 0:
-                errors = OrderedDict([
-                    ('err_d', err_d),
-                    ('err_g', err_g),
-                    ('err_g_adv', err_d_fake),
-                    ('err_g_con', err_g_con),
-                    ('err_g_lat', err_g_lat)])
                 if self.opt.display:
-                    counter_ratio = float(epoch_iter) / len(self.dataloaders[0].train.dataset)
+                    counter_ratio = float(epoch_iter) / len(self.dataloader.train.dataset)
                     self.visualizer.plot_current_errors(i_epoch, counter_ratio, errors)
 
             if epoch_iter % self.opt.save_image_freq == 0:
-                reals, fakes = x_reals[0::self.opt.batchsize], x_fakes[0::self.opt.batchsize]
+                reals, fakes = x_real[0], torch.cat([net_G(x_real[0:1]) for net_G in self.net_Gs],dim=0)
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
@@ -239,7 +245,8 @@ class ANB:
             # printing option
 
     def train(self):
-        self.net_D.train()
+        for net_D in self.net_Ds:
+            net_D.train()
         for net_G in self.net_Gs:
             net_G.train()
         for epoch in range(self.opt.niter):

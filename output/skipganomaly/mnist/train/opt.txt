@@ -12,7 +12,6 @@ display_port: 8097
 display_server: http://localhost
 droplast: True
 extralayers: 0
-gnoise_alpha: 0.0001
 gpu_ids: []
 isTrain: True
 isize: 32
@@ -24,7 +23,8 @@ lr_policy: lambda
 manualseed: -1
 metric: roc
 model: skipganomaly
-n_MC_samples: 6
+n_MC_Disc: 6
+n_MC_Gen: 6
 name: skipganomaly/mnist
 nc: 1
 ndf: 64
@@ -32,6 +32,7 @@ ngf: 64
 ngpu: 1
 niter: 15
 niter_decay: 100
+noise_alpha: 0.0001
 nz: 100
 outf: ./output
 path: 
