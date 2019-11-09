@@ -20,22 +20,30 @@ from utils.loss import lat_loss, con_loss, noise_loss, prior_loss
 class ANB:
     def __init__(self, opt):
         self.opt = opt
-        # self.dataloader = load_data(opt)
-        self.dataloaders = [load_data(opt) for _ in range(self.opt.n_MC_samples)]
+        self.dataloader = load_data(opt)
+        # self.dataloaders = [load_data(opt) for _ in range(self.opt.n_MC_samples)]
         self.epoch = self.opt.niter
         self.data_size = len(self.dataloaders[0].train) * self.opt.batchsize
         self.visualizer = Visualizer(opt)
         self.device = 'cpu' if not self.opt.gpu_ids else 'cuda'
 
         # TODO: initialize network and optimizer
-        self.net_D = Discriminator(self.opt).to(self.device)
-        self.optimizer_D = torch.optim.Adam(self.net_D.parameters(), lr=self.opt.lr)
+        self.net_Ds = []
+        self.optimizer_Ds = []
+
+        d_lr = self.opt.lr * self.opt.n_MC_Disc
+
+        net_D = Discriminator(self.opt).to(self.device)
+        optimizer_D = torch.optim.Adam(net_D.parameters(), lr=d_lr)
+
+        self.net_Ds.append(net_D)
+        self.optimizer_Ds.append(optimizer_D)
 
         self.net_Gs = []
         self.optimizer_Gs = []
 
-        g_lr = self.opt.lr * self.opt.n_MC_samples
-        # batch_norm_layers = {}
+        g_lr = self.opt.lr * self.opt.n_MC_Gen
+
         net_G = Generator(self.opt, batch_norm_layers={}).to(self.device)
         optimizer_G = torch.optim.SGD(net_G.parameters(), lr=g_lr)
 
@@ -45,7 +53,7 @@ class ANB:
         if self.opt.bayes:
             # TODO: define the loss function (piror and noise) proposal by SGHMC
             self.net_Gs[0].apply(weights_init)
-            for _idxmc in range(1, self.opt.n_MC_samples):
+            for _idxmc in range(1, self.opt.n_MC_Gen):
                 net_G = Generator(self.opt, batch_norm_layers={}).to(self.device)
                 # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
                 net_G.apply(weights_init)
@@ -53,16 +61,30 @@ class ANB:
                 self.net_Gs.append(net_G)
                 self.optimizer_Gs.append(optimizer_G)
 
+            self.net_Ds[0].apply(weights_init)
+            for _idxmc in range(1, self.opt.n_MC_Disc):
+                net_D = Discriminator(self.opt).to(self.device)
+                # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
+                net_D.apply(weights_init)
+                optimizer_D = torch.optim.Adam(net_D.parameters(), lr=d_lr)
+                self.net_Ds.append(net_D)
+                self.optimizer_Ds.append(optimizer_D)
+
         # TODO: define discriminator loss function
         self.l_adv = nn.BCELoss(reduction='mean')
         self.l_con = con_loss(b=self.opt.scale_con, reduction='mean')
         self.l_lat = lat_loss(sigma=self.opt.sigma_lat, reduction='mean')
 
+
         # TODO: define hmc loss
         if self.opt.bayes:
-            self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size*self.opt.n_MC_samples)
-            self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.gnoise_alpha / self.opt.lr),
-                                        data_size=self.data_size*self.opt.n_MC_samples)
+            self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size * self.opt.n_MC_Gen)
+            self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha / g_lr),
+                                        data_size=self.data_size * self.opt.n_MC_Gen)
+
+            self.l_d_prior = prior_loss(prior_std=1, data_size=self.data_size * self.opt.n_MC_Disc)
+            self.l_d_noise = noise_loss(params=self.net_Ds[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha / d_lr),
+                                        data_size=self.data_size * self.opt.n_MC_Disc)
 
     def train_epoch(self, i_epoch):
         '''
@@ -71,74 +93,70 @@ class ANB:
         problem 3: when to stop the reconstruction loss backward, can not allow it dominate all the time (no uncertainty)
         problem 4: shuffle the batch for each model in parallel (solved)
         '''
+        # for _iter in tqdm(range(len(self.dataloaders[0].train))):
+        for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))):
 
-        for _iter in tqdm(range(len(self.dataloaders[0].train))):
+            for _idxD in range(self.opt.n_MC_Disc):
+                # TODO update each disc with all gens
+                self.net_Ds[_idxD].zero_grad()
+                label_real = torch.ones(x_real.shape[0]).to(self.device)
+                pred_real, feat_real = self.net_Ds[_idxD](x_real)
+                err_d_real = self.l_adv(pred_real, label_real)
+                # err_d_real = self.opt.w_adv * self.l_adv(pred_reals, label_reals)
+                err_d_fakes = []
+                err_g_lat = []  # do we need to update latent feature loss in D?
+                for _idxG in range(self.opt.n_MC_Gen):
+                    x_fake = self.net_Gs[_idxG](x_real)
+                    pred_fake, feat_fake = self.net_Ds[_idxD](x_fake.detach())
+                    label_fake = torch.zeros(x_real.shape[0]).to(self.device)
 
-            # TODO load n_MC * batch sample from n_MC dataloader
-            x_reals = []
-            x_fakes = []
-            for idx_mc in range(self.opt.n_MC_samples):
-                x_real, _ = next(iter(self.dataloaders[idx_mc].train))
-                x_fake = self.net_Gs[idx_mc](x_real)
-                x_reals.append(x_real)
-                x_fakes.append(x_fake)
-            x_reals = torch.cat(x_reals, dim=0)
-            x_fakes = torch.cat(x_fakes, dim=0)
-            # TODO Discriminator optimize step
+                    err_d_fake = self.l_adv(pred_fake, label_fake)
+                    err_d_fakes.append(err_d_fake)
 
-            self.net_D.zero_grad()
-            label_reals = torch.ones(x_reals.shape[0]).to(self.device)
-            label_fakes = torch.zeros(x_reals.shape[0]).to(self.device)
+                # err_g_lat = self.l_lat(feat_real, feat_fake)  # do we need to update latent feature loss in D?
+                err_d_total_loss = torch.tensor(0).to(self.device)
+                for err_d_fake in err_d_fakes:
+                    err_d_loss = err_d_fake + err_d_real
+                    if self.opt.bayes:
+                        err_d_loss += self.l_d_noise(self.net_Ds[_idxD].parameters()) + self.l_d_prior(self.net_Ds[_idxD].parameters())
+                    err_d_total_loss += err_d_loss
+                err_d_total_loss /= self.opt.n_MC_Gen
+                err_d_total_loss.backward()
+                self.optimizer_Ds[_idxD].step()
 
-            # step1(a): Real input feed foward
-            pred_reals, feat_reals = self.net_D(x_reals)
-            # step1(b): Real loss
-            err_d_real = self.opt.w_adv * self.l_adv(pred_reals, label_reals)
+            for _idxG in range(self.opt.n_MC_Gen):
+                self.net_Gs[_idxG].zero_grad()
 
-            # step2(a): Fake input feed foward
-            pred_fakes, feat_fakes = self.net_D(x_fakes.detach())  # don't backprop net_G!
-            # step2(cb): Fake loss
-            err_d_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_fakes)
+                x_fake = self.net_Gs[_idxG](x_real)
+                err_g_con = self.l_con(x_real, x_fake)
 
-            # step3: Latent feature loss
-            err_g_lat = self.l_lat(feat_reals, feat_fakes)
+                err_g_fakes = []
+                err_g_lats = []
 
-            # TODO: add SGHMC for Discriminative (or just pure discriminative loss)
-            # step4: err summerize
-            err_d = err_d_fake + err_d_real + err_g_lat
-            err_d.backward(retain_graph=True)
+                for _idxD in range(self.opt.n_MC_Disc):
+                    _, feat_real = self.net_Ds[_idxD](x_real)
+                    x_fake = self.net_Gs[_idxG](x_real)
+                    pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
+                    label_real = torch.ones(x_real.shape[0]).to(self.device)
 
-            # step5: optimize net_D
-            self.optimizer_D.step()
+                    err_g_fake = self.l_adv(pred_fake, label_real)
+                    err_g_fakes.append(err_g_fake)
 
-            # TODO Generator optimize step
-            for net_G in self.net_Gs:
-                net_G.zero_grad()
-            # step1(a): Fake input feed foward
-            pred_fakes, _ = self.net_D(x_fakes)  # backprop net_G!
-            # step1(b): Fake loss (gradient inverse, use label_real)
-            err_g_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_reals)
-            # pretrain use reconstruction loss (strategy not confirm)
+                    err_g_lat = self.l_lat(feat_real, feat_fake)
+                    err_g_lats.append(err_g_lat)
 
-            # step2: Fake reconstruction loss
-            if True:
-                err_g_con = self.l_con(x_reals, x_fakes)
+                err_g_total_loss = torch.tensor(0).to(self.device)
+                for err_g_fake, err_g_lat in zip(err_g_fakes, err_g_lats):
+                    err_g_loss = err_g_fake + err_g_lat
+                    if self.opt.bayes:
+                        err_g_loss += self.l_g_noise(self.net_Gs[_idxG].parameters()) + self.l_g_prior(self.net_Gs[_idxG].parameters())
+                    err_g_total_loss += err_g_loss
+                err_g_total_loss /= self.opt.n_MC_Disc
+                err_g_total_loss += err_g_con
+                err_g_total_loss.backward()
+                self.optimizer_Gs[_idxG].step()
 
-            err_g = err_g_fake + err_g_lat + err_g_con
-
-            # do SGHMC for err_g_fake and err_g_lat
-            if self.opt.bayes:
-                for net_G in self.net_Gs:
-                    err_g += self.l_g_noise(net_G.parameters())
-
-                    err_g += self.l_g_prior(net_G.parameters())
-            err_g.backward(retain_graph=True)
-            # optimize net_G
-            for optimizer_G in self.optimizer_Gs:
-                optimizer_G.step()
-
-            # printing option
-            epoch_iter = _iter * self.opt.batchsize
+            epoch_iter = iter * self.opt.batchsize
             if epoch_iter % self.opt.print_freq == 0:
                 errors = OrderedDict([
                     ('err_d', err_d),
@@ -155,6 +173,70 @@ class ANB:
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
+
+            # # TODO load n_MC * batch sample from n_MC dataloader
+            # x_reals = []
+            # x_fakes = []
+            # for idx_mc in range(self.opt.n_MC_samples):
+            #     x_fake = self.net_Gs[idx_mc](x_real)
+            #     x_reals.append(x_real)
+            #     x_fakes.append(x_fake)
+            # x_reals = torch.cat(x_reals, dim=0)
+            # x_fakes = torch.cat(x_fakes, dim=0)
+            # # TODO Discriminator optimize step
+            #
+            # self.net_D.zero_grad()
+            # label_reals = torch.ones(x_reals.shape[0]).to(self.device)
+            # label_fakes = torch.zeros(x_reals.shape[0]).to(self.device)
+            #
+            # # step1(a): Real input feed foward
+            # pred_reals, feat_reals = self.net_D(x_reals)
+            # # step1(b): Real loss
+            # err_d_real = self.opt.w_adv * self.l_adv(pred_reals, label_reals)
+            #
+            # # step2(a): Fake input feed foward
+            # pred_fakes, feat_fakes = self.net_D(x_fakes.detach())  # don't backprop net_G!
+            # # step2(cb): Fake loss
+            # err_d_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_fakes)
+            #
+            # # step3: Latent feature loss
+            # err_g_lat = self.l_lat(feat_reals, feat_fakes)
+            #
+            # # TODO: add SGHMC for Discriminative (or just pure discriminative loss)
+            # # step4: err summerize
+            # err_d = err_d_fake + err_d_real + err_g_lat
+            # err_d.backward(retain_graph=True)
+            #
+            # # step5: optimize net_D
+            # self.optimizer_D.step()
+            #
+            # # TODO Generator optimize step
+            # for net_G in self.net_Gs:
+            #     net_G.zero_grad()
+            # # step1(a): Fake input feed foward
+            # pred_fakes, _ = self.net_D(x_fakes)  # backprop net_G!
+            # # step1(b): Fake loss (gradient inverse, use label_real)
+            # err_g_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_reals)
+            # # pretrain use reconstruction loss (strategy not confirm)
+            #
+            # # step2: Fake reconstruction loss
+            # if True:
+            #     err_g_con = self.l_con(x_reals, x_fakes)
+            #
+            # err_g = err_g_fake + err_g_lat + err_g_con
+            #
+            # # do SGHMC for err_g_fake and err_g_lat
+            # if self.opt.bayes:
+            #     for net_G in self.net_Gs:
+            #         err_g += self.l_g_noise(net_G.parameters())
+            #
+            #         err_g += self.l_g_prior(net_G.parameters())
+            # err_g.backward(retain_graph=True)
+            # # optimize net_G
+            # for optimizer_G in self.optimizer_Gs:
+            #     optimizer_G.step()
+
+            # printing option
 
     def train(self):
         self.net_D.train()

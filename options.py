@@ -46,8 +46,9 @@ class Options():
         self.parser.add_argument('--abnormal_class', default='0', help='Anomaly class idx for mnist and cifar datasets')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric.')
         self.parser.add_argument('--bayes', action='store_true', default=True, help='Drop last batch size.')
-        self.parser.add_argument('--n_MC_samples', type=int, default=6, help='number of sample parameters')
-        self.parser.add_argument('--gnoise_alpha', type=float, default=0.0001, help='SGHMC friction and noise')
+        self.parser.add_argument('--n_MC_Gen', type=int, default=6, help='number of Generator parameters')
+        self.parser.add_argument('--n_MC_Disc', type=int, default=6, help='number of Discriminator parameters')
+        self.parser.add_argument('--noise_alpha', type=float, default=0.0001, help='SGHMC friction and noise')
 
         ##
         # Train
