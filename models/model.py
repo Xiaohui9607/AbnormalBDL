@@ -121,19 +121,20 @@ class ANB:
                 # err_g_lat = self.l_lat(feat_real, feat_fake)  # do we need to update latent feature loss in D?
                 # err_d_total_loss = torch.tensor(0, dtype=torch.float32).to(self.device)
 
-                err_d_total_losses = torch.zeros([1, ], dtype=torch.float32).to(self.device)
+                err_d_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
                 for err_d_fake in err_d_fakes:
                     err_d_loss = err_d_fake + err_d_real
                     if self.opt.bayes:
                         err_d_loss += self.l_d_noise(self.net_Ds[_idxD].parameters()) + self.l_d_prior(self.net_Ds[_idxD].parameters())
-                    err_d_total_losses += torch.exp(err_d_loss)
+                    err_d_total_loss += err_d_total_loss
+                    # err_d_total_losses += torch.exp(err_d_loss)
                     # err_d_loss = err_d_loss.reshape([1])
                     # err_d_total_losses.append(err_d_loss)
 
                 # err_d_total_losses = torch.cat(err_d_total_losses, dim=0)
                 # err_d_total_loss = torch.logsumexp(err_d_total_losses, dim=0, keepdim=True)
                 # err_d_total_loss.backward(retain_graph=True)
-                err_d_total_loss = torch.log(err_d_total_losses)
+                err_d_total_loss /= self.opt.n_MC_Gen
                 err_d_total_loss.backward()
                 self.optimizer_Ds[_idxD].step()
                 errors['err_d'].append(err_d_total_loss.detach())
@@ -161,20 +162,20 @@ class ANB:
                     err_g_lats.append(err_g_lat)
 
                 # err_g_total_losses = []
-                err_g_total_losses = torch.zeros([1, ], dtype=torch.float32).to(self.device)
+                err_g_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
                 err_g_total_lat = torch.tensor(0, dtype=torch.float32).to(self.device)
                 for err_g_fake, err_g_lat in zip(err_g_fakes, err_g_lats):
                     err_g_loss = err_g_fake + err_g_lat
                     err_g_total_lat += err_g_lat
                     if self.opt.bayes:
                         err_g_loss += self.l_g_noise(self.net_Gs[_idxG].parameters()) + self.l_g_prior(self.net_Gs[_idxG].parameters())
-                    err_g_total_losses += torch.exp(err_g_loss)
+                    err_g_total_loss += err_g_loss
                     # err_g_loss = err_g_loss.reshape((1,))
                     # err_g_total_losses.append(err_g_loss)
 
                 # err_g_total_losses = torch.cat(err_g_total_losses, dim=0)
                 # err_g_total_loss = torch.logsumexp(err_g_total_losses, dim=0, keepdim=True)
-                err_g_total_loss = torch.log(err_g_total_losses)
+                err_g_total_loss /= self.opt.n_MC_Disc
                 err_g_total_loss += err_g_con
                 # err_g_total_loss.backward(retain_graph=True)
                 err_g_total_loss.backward()
