@@ -65,7 +65,7 @@ class Options():
         self.parser.add_argument('--lr', type=float, default=0.002, help='initial learning rate for adam')
 
         self.parser.add_argument('--sigma_lat', type=float, default=1, help='Weight for reconstruction loss. default=1')
-        self.parser.add_argument('--scale_con', type=float, default=0.02, help='Weight for latent space loss. default=0.02')
+        self.parser.add_argument('--scale_con', type=float, default=0.05, help='Weight for latent space loss. default=0.02')
         self.parser.add_argument('--w_adv', type=float, default=1, help='Weight for adversarial loss. default=1')
         # self.parser.add_argument('--w_con', type=float, default=50, help='Weight for reconstruction loss. default=50')
         # self.parser.add_argument('--w_lat', type=float, default=1, help='Weight for latent space loss. default=1')

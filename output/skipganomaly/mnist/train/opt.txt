@@ -41,7 +41,7 @@ print_freq: 100
 resume: 
 save_image_freq: 100
 save_test_images: False
-scale_con: 0.02
+scale_con: 0.05
 sigma_lat: 1
 verbose: False
 w_adv: 1
