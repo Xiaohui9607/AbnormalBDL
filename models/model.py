@@ -16,6 +16,7 @@ from dataloader.dataloader import load_data
 from models.networks import Generator, Discriminator
 from utils.loss import lat_loss, con_loss, noise_loss, prior_loss
 
+torch.autograd.set_detect_anomaly(True)
 
 class ANB:
     def __init__(self, opt):
@@ -110,6 +111,7 @@ class ANB:
                 err_d_fakes = []
                 # err_g_lat = []  # do we need to update latent feature loss in D?
                 for _idxG in range(self.opt.n_MC_Gen):
+                    self.net_Gs[_idxG].zero_grad()
                     x_fake = self.net_Gs[_idxG](x_real)
                     pred_fake, feat_fake = self.net_Ds[_idxD](x_fake.detach())
                     label_fake = torch.zeros(x_real.shape[0]).to(self.device)
@@ -119,13 +121,19 @@ class ANB:
                 # err_g_lat = self.l_lat(feat_real, feat_fake)  # do we need to update latent feature loss in D?
                 # err_d_total_loss = torch.tensor(0, dtype=torch.float32).to(self.device)
 
-                err_d_total_losses = []
+                err_d_total_losses = torch.zeros([1, ], dtype=torch.float32).to(self.device)
                 for err_d_fake in err_d_fakes:
                     err_d_loss = err_d_fake + err_d_real
                     if self.opt.bayes:
                         err_d_loss += self.l_d_noise(self.net_Ds[_idxD].parameters()) + self.l_d_prior(self.net_Ds[_idxD].parameters())
-                    err_d_total_losses.append(err_d_loss.reshape([1]))
-                err_d_total_loss = torch.logsumexp(torch.cat(err_d_total_losses, dim=0), dim=0)
+                    err_d_total_losses += torch.exp(err_d_loss)
+                    # err_d_loss = err_d_loss.reshape([1])
+                    # err_d_total_losses.append(err_d_loss)
+
+                # err_d_total_losses = torch.cat(err_d_total_losses, dim=0)
+                # err_d_total_loss = torch.logsumexp(err_d_total_losses, dim=0, keepdim=True)
+                # err_d_total_loss.backward(retain_graph=True)
+                err_d_total_loss = torch.log(err_d_total_losses)
                 err_d_total_loss.backward()
                 self.optimizer_Ds[_idxD].step()
                 errors['err_d'].append(err_d_total_loss.detach())
@@ -140,6 +148,7 @@ class ANB:
                 err_g_lats = []
 
                 for _idxD in range(self.opt.n_MC_Disc):
+                    self.net_Ds[_idxD].zero_grad()
                     _, feat_real = self.net_Ds[_idxD](x_real)
                     x_fake = self.net_Gs[_idxG](x_real)
                     pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
@@ -151,16 +160,23 @@ class ANB:
                     err_g_lat = self.l_lat(feat_real, feat_fake)
                     err_g_lats.append(err_g_lat)
 
-                err_g_total_losses = []
+                # err_g_total_losses = []
+                err_g_total_losses = torch.zeros([1, ], dtype=torch.float32).to(self.device)
                 err_g_total_lat = torch.tensor(0, dtype=torch.float32).to(self.device)
                 for err_g_fake, err_g_lat in zip(err_g_fakes, err_g_lats):
                     err_g_loss = err_g_fake + err_g_lat
                     err_g_total_lat += err_g_lat
                     if self.opt.bayes:
                         err_g_loss += self.l_g_noise(self.net_Gs[_idxG].parameters()) + self.l_g_prior(self.net_Gs[_idxG].parameters())
-                    err_g_total_losses.append(err_g_loss.reshape([1]))
-                err_g_total_loss = torch.logsumexp(torch.cat(err_g_total_losses, dim=0), dim=0)
+                    err_g_total_losses += torch.exp(err_g_loss)
+                    # err_g_loss = err_g_loss.reshape((1,))
+                    # err_g_total_losses.append(err_g_loss)
+
+                # err_g_total_losses = torch.cat(err_g_total_losses, dim=0)
+                # err_g_total_loss = torch.logsumexp(err_g_total_losses, dim=0, keepdim=True)
+                err_g_total_loss = torch.log(err_g_total_losses)
                 err_g_total_loss += err_g_con
+                # err_g_total_loss.backward(retain_graph=True)
                 err_g_total_loss.backward()
                 self.optimizer_Gs[_idxG].step()
 
@@ -258,8 +274,10 @@ class ANB:
 
     def save_weight(self, epoch):
         for _idx, net_G in enumerate(self.net_Gs):
-            torch.save(net_G.state_dict(), 'Net_D_{0}_epoch_{1}.pth'.format(_idx, epoch))
-        torch.save(self.net_D.state_dict(), 'Net_G_epoch_{0}.pth'.format(epoch))
+            torch.save(net_G.state_dict(), 'Net_G_{0}_epoch_{1}.pth'.format(_idx, epoch))
+
+        for _idx, net_D in enumerate(self.net_Ds):
+            torch.save(net_D.state_dict(), 'Net_D_{0}_}poch_{1}.pth'.format(_idx, epoch))
 
     def test_epoch(self, epoch, plot_hist=False):
         with torch.no_grad():
@@ -271,18 +289,19 @@ class ANB:
 
             scores = {}
 
-            # Create big error tensor for the test set.
-            self.an_scores = torch.zeros(size=(len(self.data.valid.dataset),), dtype=torch.float32,
-                                         device=self.device)
-            self.gt_labels = torch.zeros(size=(len(self.data.valid.dataset),), dtype=torch.long, device=self.device)
-            self.features = torch.zeros(size=(len(self.data.valid.dataset), self.opt.nz), dtype=torch.float32,
-                                        device=self.device)
 
-            print("   Testing %s" % self.name)
-            self.times = []
+            # Create big error tensor for the test set.
+            # an_scores =
+            an_scores = torch.zeros(size=(self.opt.n_MC_Gen * self.opt.n_MC_Disc, len(self.dataloader.valid.dataset)), dtype=torch.float32,
+                                    device=self.device)
+            gt_labels = torch.zeros(size=(self.opt.n_MC_Gen * self.opt.n_MC_Disc, len(self.dataloader.valid.dataset)), dtype=torch.long, device=self.device)
+            features = torch.zeros(size=(self.opt.n_MC_Gen * self.opt.n_MC_Disc, len(self.dataloader.valid.dataset), self.opt.nz), dtype=torch.float32,
+                                   device=self.device)
+
+            # self.times = []
             self.total_steps = 0
             epoch_iter = 0
-            for i, data in enumerate(self.data.valid, 0):
+            for i, data in enumerate(self.dataloader.valid, 0):
                 self.total_steps += self.opt.batchsize
                 epoch_iter += self.opt.batchsize
                 time_i = time.time()
