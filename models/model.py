@@ -175,7 +175,7 @@ class ANB:
                     self.visualizer.plot_current_errors(i_epoch, counter_ratio, errors)
 
             if epoch_iter % self.opt.save_image_freq == 0:
-                reals, fakes = x_real[0], torch.cat([net_G(x_real[0:1]) for net_G in self.net_Gs],dim=0)
+                reals, fakes = x_real[0:1], torch.cat([net_G(x_real[0:1]) for net_G in self.net_Gs], dim=0).squeeze(0)
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)

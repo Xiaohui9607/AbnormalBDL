@@ -172,7 +172,7 @@ class Visualizer():
             fakes ([FloatTensor]): Fake Image
             fixed ([FloatTensor]): Fixed Fake Image
         """
-        o_img = torch.cat([reals, fakes], dim=1)
+        o_img = torch.cat([reals, fakes])
         self.normalize(o_img.cpu().numpy())
         # reals = self.normalize(reals.cpu().numpy())
         # fakes = self.normalize(fakes.cpu().numpy())
@@ -193,8 +193,8 @@ class Visualizer():
             fixed ([FloatTensor]): Fixed Fake Image
         """
         # TODO change the method to: concat real + mc * fake image horizontally into 1 image and save
-        o_img = torch.cat([reals, fakes], dim=2)
-        vutils.save_image(o_img, '%s/img.png' % self.img_dir, normalize=True)
+        o_img = torch.cat([reals, fakes])
+        vutils.save_image(o_img, '%s/%s.png' % (self.img_dir, epoch), normalize=True)
         # vutils.save_image(reals, '%s/reals.png' % self.img_dir, normalize=True)
         # vutils.save_image(fakes, '%s/fakes.png' % self.img_dir, normalize=True)
         # vutils.save_image(fixed, '%s/fixed_fakes_%03d.png' %(self.img_dir, epoch+1), normalize=True)
