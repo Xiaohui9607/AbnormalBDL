@@ -127,13 +127,7 @@ class ANB:
                     if self.opt.bayes:
                         err_d_loss += self.l_d_noise(self.net_Ds[_idxD].parameters()) + self.l_d_prior(self.net_Ds[_idxD].parameters())
                     err_d_total_loss += err_d_total_loss
-                    # err_d_total_losses += torch.exp(err_d_loss)
-                    # err_d_loss = err_d_loss.reshape([1])
-                    # err_d_total_losses.append(err_d_loss)
 
-                # err_d_total_losses = torch.cat(err_d_total_losses, dim=0)
-                # err_d_total_loss = torch.logsumexp(err_d_total_losses, dim=0, keepdim=True)
-                # err_d_total_loss.backward(retain_graph=True)
                 err_d_total_loss /= self.opt.n_MC_Gen
                 err_d_total_loss.backward()
                 self.optimizer_Ds[_idxD].step()
@@ -161,7 +155,6 @@ class ANB:
                     err_g_lat = self.l_lat(feat_real, feat_fake)
                     err_g_lats.append(err_g_lat)
 
-                # err_g_total_losses = []
                 err_g_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
                 err_g_total_lat = torch.tensor(0, dtype=torch.float32).to(self.device)
                 for err_g_fake, err_g_lat in zip(err_g_fakes, err_g_lats):
@@ -170,11 +163,7 @@ class ANB:
                     if self.opt.bayes:
                         err_g_loss += self.l_g_noise(self.net_Gs[_idxG].parameters()) + self.l_g_prior(self.net_Gs[_idxG].parameters())
                     err_g_total_loss += err_g_loss
-                    # err_g_loss = err_g_loss.reshape((1,))
-                    # err_g_total_losses.append(err_g_loss)
 
-                # err_g_total_losses = torch.cat(err_g_total_losses, dim=0)
-                # err_g_total_loss = torch.logsumexp(err_g_total_losses, dim=0, keepdim=True)
                 err_g_total_loss /= self.opt.n_MC_Disc
                 err_g_total_loss += err_g_con
                 # err_g_total_loss.backward(retain_graph=True)
@@ -199,70 +188,6 @@ class ANB:
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
 
-            # # TODO load n_MC * batch sample from n_MC dataloader
-            # x_reals = []
-            # x_fakes = []
-            # for idx_mc in range(self.opt.n_MC_samples):
-            #     x_fake = self.net_Gs[idx_mc](x_real)
-            #     x_reals.append(x_real)
-            #     x_fakes.append(x_fake)
-            # x_reals = torch.cat(x_reals, dim=0)
-            # x_fakes = torch.cat(x_fakes, dim=0)
-            # # TODO Discriminator optimize step
-            #
-            # self.net_D.zero_grad()
-            # label_reals = torch.ones(x_reals.shape[0]).to(self.device)
-            # label_fakes = torch.zeros(x_reals.shape[0]).to(self.device)
-            #
-            # # step1(a): Real input feed foward
-            # pred_reals, feat_reals = self.net_D(x_reals)
-            # # step1(b): Real loss
-            # err_d_real = self.opt.w_adv * self.l_adv(pred_reals, label_reals)
-            #
-            # # step2(a): Fake input feed foward
-            # pred_fakes, feat_fakes = self.net_D(x_fakes.detach())  # don't backprop net_G!
-            # # step2(cb): Fake loss
-            # err_d_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_fakes)
-            #
-            # # step3: Latent feature loss
-            # err_g_lat = self.l_lat(feat_reals, feat_fakes)
-            #
-            # # TODO: add SGHMC for Discriminative (or just pure discriminative loss)
-            # # step4: err summerize
-            # err_d = err_d_fake + err_d_real + err_g_lat
-            # err_d.backward(retain_graph=True)
-            #
-            # # step5: optimize net_D
-            # self.optimizer_D.step()
-            #
-            # # TODO Generator optimize step
-            # for net_G in self.net_Gs:
-            #     net_G.zero_grad()
-            # # step1(a): Fake input feed foward
-            # pred_fakes, _ = self.net_D(x_fakes)  # backprop net_G!
-            # # step1(b): Fake loss (gradient inverse, use label_real)
-            # err_g_fake = self.opt.w_adv * self.l_adv(pred_fakes, label_reals)
-            # # pretrain use reconstruction loss (strategy not confirm)
-            #
-            # # step2: Fake reconstruction loss
-            # if True:
-            #     err_g_con = self.l_con(x_reals, x_fakes)
-            #
-            # err_g = err_g_fake + err_g_lat + err_g_con
-            #
-            # # do SGHMC for err_g_fake and err_g_lat
-            # if self.opt.bayes:
-            #     for net_G in self.net_Gs:
-            #         err_g += self.l_g_noise(net_G.parameters())
-            #
-            #         err_g += self.l_g_prior(net_G.parameters())
-            # err_g.backward(retain_graph=True)
-            # # optimize net_G
-            # for optimizer_G in self.optimizer_Gs:
-            #     optimizer_G.step()
-
-            # printing option
-
     def train(self):
         for net_D in self.net_Ds:
             net_D.train()
@@ -282,17 +207,13 @@ class ANB:
 
     def test_epoch(self, epoch, plot_hist=False):
         with torch.no_grad():
-            # Load the weights of netg and netd.
-            # if self.opt.load_weights:
-            #     self.load_weights(is_best=True)
 
             self.opt.phase = 'test'
 
             scores = {}
 
-
             # Create big error tensor for the test set.
-            # an_scores =
+
             an_scores = torch.zeros(size=(self.opt.n_MC_Gen * self.opt.n_MC_Disc, len(self.dataloader.valid.dataset)), dtype=torch.float32,
                                     device=self.device)
             gt_labels = torch.zeros(size=(self.opt.n_MC_Gen * self.opt.n_MC_Disc, len(self.dataloader.valid.dataset)), dtype=torch.long, device=self.device)

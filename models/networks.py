@@ -134,17 +134,16 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self, opt):
         super(Discriminator, self).__init__()
-        model = Encoder(opt.isize, 1, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-        layers = list(model.main.children())
-
-        self.features = nn.Sequential(*layers[:-1])
-        self.classifier = nn.Sequential(layers[-1])
-        self.classifier.add_module('classifier', nn.Conv2d(1, 1, 3, 1, 1, bias=False))
+        self.feat = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        # layers = list(model.main.children())
+        #
+        # self.features = nn.Sequential(*layers[:-1])
+        self.classifier = nn.Sequential()
+        self.classifier.add_module('classifier', nn.Conv2d(opt.nz, 1, 3, 1, 1, bias=False))
         self.classifier.add_module('Sigmoid', nn.Sigmoid())
 
     def forward(self, x):
-        features = self.features(x)
-        features = features
+        features = self.feat(x)
         classifier = self.classifier(features)
         classifier = classifier.view(-1, 1).squeeze(1)
 
