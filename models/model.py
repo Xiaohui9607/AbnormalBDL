@@ -1,15 +1,12 @@
 import os
 import math
-import time
 import torch
-import random
-import numpy as np
 import pandas as pd
 from torch import nn
 from tqdm import tqdm
 import seaborn as sns
 import matplotlib.pyplot as plt
-import torchvision.utils as vutils
+from models.evaluate import roc
 from collections import OrderedDict
 from utils import weights_init, Visualizer
 from dataloader.dataloader import load_data
@@ -22,20 +19,19 @@ class ANB:
     def __init__(self, opt):
         self.opt = opt
         self.dataloader = load_data(opt)
-        # self.dataloaders = [load_data(opt) for _ in range(self.opt.n_MC_samples)]
         self.epoch = self.opt.niter
         self.data_size = len(self.dataloader.train) * self.opt.batchsize
         self.visualizer = Visualizer(opt)
         self.device = 'cpu' if not self.opt.gpu_ids else 'cuda'
 
+        self.rocs = []
         # TODO: initialize network and optimizer
         self.net_Ds = []
         self.optimizer_Ds = []
-
-        d_lr = self.opt.lr * self.opt.n_MC_Disc
-
+        # d_lr = self.opt.lr / self.opt.n_MC_Disc
+        # g_lr = self.opt.lr / self.opt.n_MC_Gen
         net_D = Discriminator(self.opt).to(self.device)
-        optimizer_D = torch.optim.Adam(net_D.parameters(), lr=d_lr)
+        optimizer_D = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr)
 
         self.net_Ds.append(net_D)
         self.optimizer_Ds.append(optimizer_D)
@@ -43,10 +39,8 @@ class ANB:
         self.net_Gs = []
         self.optimizer_Gs = []
 
-        g_lr = self.opt.lr * self.opt.n_MC_Gen
-
         net_G = Generator(self.opt).to(self.device)
-        optimizer_G = torch.optim.SGD(net_G.parameters(), lr=g_lr)
+        optimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
 
         self.net_Gs.append(net_G)
         self.optimizer_Gs.append(optimizer_G)
@@ -58,7 +52,7 @@ class ANB:
                 net_G = Generator(self.opt).to(self.device)
                 # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
                 net_G.apply(weights_init)
-                optimizer_G = torch.optim.SGD(net_G.parameters(), lr=g_lr)
+                optimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
                 self.net_Gs.append(net_G)
                 self.optimizer_Gs.append(optimizer_G)
 
@@ -67,7 +61,7 @@ class ANB:
                 net_D = Discriminator(self.opt).to(self.device)
                 # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
                 net_D.apply(weights_init)
-                optimizer_D = torch.optim.Adam(net_D.parameters(), lr=d_lr)
+                optimizer_D = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr)
                 self.net_Ds.append(net_D)
                 self.optimizer_Ds.append(optimizer_D)
 
@@ -79,28 +73,23 @@ class ANB:
 
         # TODO: define hmc loss
         if self.opt.bayes:
-            self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size * self.opt.n_MC_Gen)
-            self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha / g_lr),
-                                        data_size=self.data_size * self.opt.n_MC_Gen)
+            self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size)
+            self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha * self.opt.lr),
+                                        data_size=self.data_size)
 
-            self.l_d_prior = prior_loss(prior_std=1, data_size=self.data_size * self.opt.n_MC_Disc)
-            self.l_d_noise = noise_loss(params=self.net_Ds[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha / d_lr),
-                                        data_size=self.data_size * self.opt.n_MC_Disc)
+            self.l_d_prior = prior_loss(prior_std=1, data_size=self.data_size)
+            self.l_d_noise = noise_loss(params=self.net_Ds[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha * self.opt.lr),
+                                        data_size=self.data_size)
 
     def train_epoch(self, i_epoch):
-        '''
-        problem 1: n_mc_sample > 1 will mess up (solved)
-        problem 2: original code add the err_g_lat to optimize the generator, but it's meaningless!
-        problem 3: when to stop the reconstruction loss backward, can not allow it dominate all the time (no uncertainty)
-        problem 4: shuffle the batch for each model in parallel (solved)
-        '''
-        # for _iter in tqdm(range(len(self.dataloaders[0].train))):
         for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))):
             errors = OrderedDict([
                 ('err_d', []),
                 ('err_g', []),
                 ('err_g_con', []),
-                ('err_g_lat', [])])
+                ('err_d_lat', [])])
+
+            x_real = x_real.to(self.device)
             for _idxD in range(self.opt.n_MC_Disc):
                 # TODO update each disc with all gens
                 self.net_Ds[_idxD].zero_grad()
@@ -109,7 +98,8 @@ class ANB:
                 err_d_real = self.l_adv(pred_real, label_real)
                 # err_d_real = self.opt.w_adv * self.l_adv(pred_reals, label_reals)
                 err_d_fakes = []
-                # err_g_lat = []  # do we need to update latent feature loss in D?
+                err_d_lats = []  # do we need to update latent feature loss in D?
+
                 for _idxG in range(self.opt.n_MC_Gen):
                     self.net_Gs[_idxG].zero_grad()
                     x_fake = self.net_Gs[_idxG](x_real)
@@ -118,21 +108,27 @@ class ANB:
                     err_d_fake = self.l_adv(pred_fake, label_fake)
                     err_d_fakes.append(err_d_fake)
 
-                # err_g_lat = self.l_lat(feat_real, feat_fake)  # do we need to update latent feature loss in D?
-                # err_d_total_loss = torch.tensor(0, dtype=torch.float32).to(self.device)
+                    err_d_lat = self.l_lat(feat_real, feat_fake)
+                    err_d_lats.append(err_d_lat)
 
                 err_d_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
-                for err_d_fake in err_d_fakes:
-                    err_d_loss = err_d_fake + err_d_real
+                err_g_total_lat = torch.zeros([1, ], dtype=torch.float32).to(self.device)
+                for err_d_fake, err_d_lat in zip(err_d_fakes, err_d_lats):
+                    err_d_loss = err_d_fake + err_d_real + err_d_lat
                     if self.opt.bayes:
-                        err_d_loss += self.l_d_noise(self.net_Ds[_idxD].parameters()) + self.l_d_prior(self.net_Ds[_idxD].parameters())
-                    err_d_total_loss += err_d_total_loss
+                        err_d_loss += self.l_d_noise(self.net_Ds[_idxD].parameters()) + \
+                                      self.l_d_prior(self.net_Ds[_idxD].parameters())
+                    err_d_total_loss += err_d_loss
+                    err_g_total_lat += err_d_lat
 
                 err_d_total_loss /= self.opt.n_MC_Gen
                 err_d_total_loss.backward()
                 self.optimizer_Ds[_idxD].step()
                 errors['err_d'].append(err_d_total_loss.detach())
+                errors['err_d_lat'].append(err_g_total_lat.detach().reshape([1]))
 
+
+            # TODO update each gen with all discs
             for _idxG in range(self.opt.n_MC_Gen):
                 self.net_Gs[_idxG].zero_grad()
 
@@ -140,7 +136,7 @@ class ANB:
                 err_g_con = self.l_con(x_real, x_fake)
 
                 err_g_fakes = []
-                err_g_lats = []
+                # err_g_lats = []
 
                 for _idxD in range(self.opt.n_MC_Disc):
                     self.net_Ds[_idxD].zero_grad()
@@ -152,17 +148,24 @@ class ANB:
                     err_g_fake = self.l_adv(pred_fake, label_real)
                     err_g_fakes.append(err_g_fake)
 
-                    err_g_lat = self.l_lat(feat_real, feat_fake)
-                    err_g_lats.append(err_g_lat)
+                    # err_g_lat = self.l_lat(feat_real, feat_fake)
+                    # err_g_lats.append(err_g_lat)
 
                 err_g_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
-                err_g_total_lat = torch.tensor(0, dtype=torch.float32).to(self.device)
-                for err_g_fake, err_g_lat in zip(err_g_fakes, err_g_lats):
-                    err_g_loss = err_g_fake + err_g_lat
-                    err_g_total_lat += err_g_lat
+                # err_g_total_lat = torch.zeros([1, ], dtype=torch.float32).to(self.device)
+                for err_g_fake in err_g_fakes:
+                    # err_g_loss = err_g_fake + err_g_lat
                     if self.opt.bayes:
-                        err_g_loss += self.l_g_noise(self.net_Gs[_idxG].parameters()) + self.l_g_prior(self.net_Gs[_idxG].parameters())
-                    err_g_total_loss += err_g_loss
+                        err_g_fake += self.l_g_noise(self.net_Gs[_idxG].parameters()) + \
+                                      self.l_g_prior(self.net_Gs[_idxG].parameters())
+                    err_g_total_loss += err_g_fake
+                # for err_g_fake, err_g_lat in zip(err_g_fakes, err_g_lats):
+                #     err_g_loss = err_g_fake + err_g_lat
+                #     err_g_total_lat += err_g_lat
+                #     if self.opt.bayes:
+                #         err_g_loss += self.l_g_noise(self.net_Gs[_idxG].parameters()) + \
+                #                       self.l_g_prior(self.net_Gs[_idxG].parameters())
+                #     err_g_total_loss += err_g_loss
 
                 err_g_total_loss /= self.opt.n_MC_Disc
                 err_g_total_loss += err_g_con
@@ -170,20 +173,22 @@ class ANB:
                 err_g_total_loss.backward()
                 self.optimizer_Gs[_idxG].step()
 
-                err_g_total_lat /= self.opt.n_MC_Disc
-
                 errors['err_g'].append(err_g_total_loss.detach())
-                errors['err_g_lat'].append(err_g_total_lat.detach())
-                errors['err_g_con'].append(err_g_con.detach())
+                # errors['err_g_lat'].append(err_g_total_lat.detach())
+                errors['err_g_con'].append(err_g_con.detach().reshape([1]))
 
             epoch_iter = iter * self.opt.batchsize
             if epoch_iter % self.opt.print_freq == 0:
+                errors['err_g'] = torch.mean(torch.cat(errors['err_g'])).item()
+                errors['err_d_lat'] = torch.mean(torch.cat(errors['err_d_lat'])).item()
+                errors['err_g_con'] = torch.mean(torch.cat(errors['err_g_con'])).item()
+                errors['err_d'] = torch.mean(torch.cat(errors['err_d'])).cpu().item()
                 if self.opt.display:
                     counter_ratio = float(epoch_iter) / len(self.dataloader.train.dataset)
                     self.visualizer.plot_current_errors(i_epoch, counter_ratio, errors)
 
             if epoch_iter % self.opt.save_image_freq == 0:
-                reals, fakes = x_real[0:1], torch.cat([net_G(x_real[0:1]) for net_G in self.net_Gs], dim=0).squeeze(0)
+                reals, fakes = x_real[0:1], torch.cat([net_G(x_real[0:1]).detach() for net_G in self.net_Gs], dim=0)
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
@@ -200,86 +205,90 @@ class ANB:
 
     def save_weight(self, epoch):
         for _idx, net_G in enumerate(self.net_Gs):
-            torch.save(net_G.state_dict(), 'Net_G_{0}_epoch_{1}.pth'.format(_idx, epoch))
+            torch.save(net_G.state_dict(), '{0}/{1}/train/weights/Net_G_{2}_epoch_{3}.pth'.format(self.opt.outf, self.opt.name,_idx, epoch))
 
         for _idx, net_D in enumerate(self.net_Ds):
-            torch.save(net_D.state_dict(), 'Net_D_{0}_}poch_{1}.pth'.format(_idx, epoch))
+            torch.save(net_D.state_dict(), '{0}/{1}/train/weights/Net_D_{2}_epoch_{3}.pth'.format(self.opt.outf, self.opt.name,_idx, epoch))
 
-    def test_epoch(self, epoch, plot_hist=False):
+    def test_epoch(self, epoch, plot_hist=True):
         with torch.no_grad():
 
             self.opt.phase = 'test'
 
-            scores = {}
-
-            # Create big error tensor for the test set.
-
-            an_scores = torch.zeros(size=(self.opt.n_MC_Gen * self.opt.n_MC_Disc, len(self.dataloader.valid.dataset)), dtype=torch.float32,
+            mean = []
+            var = []
+            an_scores = torch.zeros(size=(len(self.dataloader.valid.dataset), self.opt.n_MC_Gen * self.opt.n_MC_Disc),
+                                    dtype=torch.float32,
                                     device=self.device)
-            gt_labels = torch.zeros(size=(self.opt.n_MC_Gen * self.opt.n_MC_Disc, len(self.dataloader.valid.dataset)), dtype=torch.long, device=self.device)
-            features = torch.zeros(size=(self.opt.n_MC_Gen * self.opt.n_MC_Disc, len(self.dataloader.valid.dataset), self.opt.nz), dtype=torch.float32,
-                                   device=self.device)
+            gt_labels = torch.zeros(size=(len(self.dataloader.valid.dataset),),
+                                         dtype=torch.long, device=self.device)
 
-            # self.times = []
-            self.total_steps = 0
-            epoch_iter = 0
-            for i, data in enumerate(self.dataloader.valid, 0):
-                self.total_steps += self.opt.batchsize
-                epoch_iter += self.opt.batchsize
-                time_i = time.time()
+            # total_steps = 0
+            # epoch_iter = 0
+            for i, (x_real, label) in enumerate(self.dataloader.valid, 0):
+                # total_steps += self.opt.batchsize
+                # epoch_iter += self.opt.batchsize
+                x_real = x_real.to(self.device)
 
-                # Forward - Pass
-                self.set_input(data)
-                self.fake = self.netg(self.input)
+                gt_labels[i * self.opt.batchsize: i * self.opt.batchsize + label.size(0)] = label
+                for j in range(self.opt.n_MC_Disc):
+                    pred_real, feat_real = self.net_Ds[j](x_real)
+                    for k in range(self.opt.n_MC_Gen):
+                        x_fake = self.net_Gs[k](x_real)
+                        pred_fake, feat_fake = self.net_Ds[j](x_fake)
 
-                _, self.feat_real = self.netd(self.input)
-                _, self.feat_fake = self.netd(self.fake)
+                        # Calculate the anomaly score.
+                        # si = x_real.size()
+                        sz = feat_real.size()
+                        # rec = (x_real - x_fake).view(si[0], si[1] * si[2] * si[3])
+                        lat = (feat_real - feat_fake).view(sz[0], sz[1] * sz[2] * sz[3])
+                        # rec = torch.mean(torch.pow(rec, 2), dim=1)
+                        lat = torch.mean(torch.pow(lat, 2), dim=1)
+                        # error = 0.9 * rec + 0.1 * lat
+                        error = lat
 
-                # Calculate the anomaly score.
-                si = self.input.size()
-                sz = self.feat_real.size()
-                rec = (self.input - self.fake).view(si[0], si[1] * si[2] * si[3])
-                lat = (self.feat_real - self.feat_fake).view(sz[0], sz[1] * sz[2] * sz[3])
-                rec = torch.mean(torch.pow(rec, 2), dim=1)
-                lat = torch.mean(torch.pow(lat, 2), dim=1)
-                error = 0.9 * rec + 0.1 * lat
 
-                time_o = time.time()
+                        an_scores[i * self.opt.batchsize: i * self.opt.batchsize + error.size(0),
+                        j * (self.opt.n_MC_Gen - 1) + k] = error.reshape(
+                            error.size(0))
 
-                self.an_scores[i * self.opt.batchsize: i * self.opt.batchsize + error.size(0)] = error.reshape(
-                    error.size(0))
-                self.gt_labels[i * self.opt.batchsize: i * self.opt.batchsize + error.size(0)] = self.gt.reshape(
-                    error.size(0))
+            test_mean = torch.mean(an_scores, dim=1)
+            test_var = torch.var(an_scores, dim=1)
 
-                self.times.append(time_o - time_i)
+            mean.append(test_mean.cpu())
+            var.append(test_var.cpu())
 
-                # Save test images.
-                if self.opt.save_test_images:
-                    dst = os.path.join(self.opt.outf, self.opt.name, 'test', 'images')
-                    if not os.path.isdir(dst): os.makedirs(dst)
-                    real, fake, _ = self.get_current_images()
-                    vutils.save_image(real, '%s/real_%03d.eps' % (dst, i + 1), normalize=True)
-                    vutils.save_image(fake, '%s/fake_%03d.eps' % (dst, i + 1), normalize=True)
+            per_scores = mean[-1]
+            per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
+            auc = roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
+                                                                            "test/plots/mean_at_epoch{0}.png".format(epoch)))
 
-            # Measure inference time.
-            self.times = np.array(self.times)
-            self.times = np.mean(self.times[:100] * 1000)
+            self.rocs.append(auc)
 
-            # Scale error vector between [0, 1]
-            self.an_scores = (self.an_scores - torch.min(self.an_scores)) / \
-                             (torch.max(self.an_scores) - torch.min(self.an_scores))
-            auc = roc(self.gt_labels, self.an_scores)
-            performance = OrderedDict([('Avg Run Time (ms/batch)', self.times), ('AUC', auc)])
-
-            ##
             # PLOT HISTOGRAM
             if plot_hist:
                 plt.ion()
                 # Create data frame for scores and labels.
-                scores['scores'] = self.an_scores
-                scores['labels'] = self.gt_labels
+                scores = {}
+                scores['scores'] = mean[-1]
+                scores['labels'] = gt_labels.cpu()
                 hist = pd.DataFrame.from_dict(scores)
-                hist.to_csv("histogram.csv")
+                hist.to_csv("{0}/{1}/test/plots/mean_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
+                re_var = {}
+                re_var['var'] = var[-1]
+                re_var['labels'] = gt_labels.cpu()
+                hist_v = pd.DataFrame.from_dict(re_var)
+                hist_v.to_csv("{0}/{1}/test/plots/var_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
+                all_scores = {}
+                record_scores = an_scores.cpu()
+
+                for j in range(self.opt.n_MC_Disc):
+                    for k in range(self.opt.n_MC_Gen):
+                        all_scores['Dis #{0}, Gen #{1}'.format(j, k)] = record_scores[:,
+                                                                        j * (self.opt.n_MC_Gen - 1) + k]
+                all_scores['labels'] = gt_labels.cpu()
+                hist_r = pd.DataFrame.from_dict(all_scores)
+                hist_r.to_csv("{0}/{1}/test/plots/scores_for_all_combination_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
 
                 # Filter normal and abnormal scores.
                 abn_scr = hist.loc[hist.labels == 1]['scores']
@@ -293,16 +302,9 @@ class ANB:
                 plt.legend()
                 plt.yticks([])
                 plt.xlabel(r'Anomaly Scores')
+                plt.savefig("{0}/{1}/test/plots/sns_at_epoch{2}.png".format(self.opt.outf, self.opt.name, epoch))
+                plt.close()
 
-            ##
-            # PLOT PERFORMANCE
-            if self.opt.display_id > 0 and self.opt.phase == 'test':
-                counter_ratio = float(epoch_iter) / len(self.data.valid.dataset)
-                self.visualizer.plot_performance(self.epoch, counter_ratio, performance)
-
-            ##
-            # RETURN
-            return performance
 
     def load_weight(self, pathlist:dict):
         pass
