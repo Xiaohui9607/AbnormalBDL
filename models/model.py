@@ -10,6 +10,7 @@ from models.evaluate import roc
 from collections import OrderedDict
 from utils import weights_init, Visualizer
 from dataloader.dataloader import load_data
+from torch.optim.lr_scheduler import StepLR
 from models.networks import Generator, Discriminator
 from utils.loss import lat_loss, con_loss, noise_loss, prior_loss
 
@@ -23,53 +24,20 @@ class ANB:
         self.data_size = len(self.dataloader.train) * self.opt.batchsize
         self.visualizer = Visualizer(opt)
         self.device = 'cpu' if not self.opt.gpu_ids else 'cuda'
+        self.global_iter = 0
 
         self.rocs = []
         # TODO: initialize network and optimizer
-        self.net_Ds = []
-        self.optimizer_Ds = []
-        # d_lr = self.opt.lr / self.opt.n_MC_Disc
-        # g_lr = self.opt.lr / self.opt.n_MC_Gen
-        net_D = Discriminator(self.opt).to(self.device)
-        optimizer_D = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr)
-
-        self.net_Ds.append(net_D)
-        self.optimizer_Ds.append(optimizer_D)
-
-        self.net_Gs = []
-        self.optimizer_Gs = []
-
-        net_G = Generator(self.opt).to(self.device)
-        optimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
-
-        self.net_Gs.append(net_G)
-        self.optimizer_Gs.append(optimizer_G)
-
-        if self.opt.bayes:
-            # TODO: define the loss function (piror and noise) proposal by SGHMC
-            self.net_Gs[0].apply(weights_init)
-            for _idxmc in range(1, self.opt.n_MC_Gen):
-                net_G = Generator(self.opt).to(self.device)
-                # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
-                net_G.apply(weights_init)
-                optimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.opt.lr)
-                self.net_Gs.append(net_G)
-                self.optimizer_Gs.append(optimizer_G)
-
-            self.net_Ds[0].apply(weights_init)
-            for _idxmc in range(1, self.opt.n_MC_Disc):
-                net_D = Discriminator(self.opt).to(self.device)
-                # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
-                net_D.apply(weights_init)
-                optimizer_D = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr)
-                self.net_Ds.append(net_D)
-                self.optimizer_Ds.append(optimizer_D)
-
+        self.generator_setup()
+        self.discriminator_setup()
+        self.optims = {
+            "gen": self.optimizer_Gs_Adam,
+            "disc": self.optimizer_Ds_Adam
+        }
         # TODO: define discriminator loss function
         self.l_adv = nn.BCELoss(reduction='mean')
         self.l_con = con_loss(b=self.opt.scale_con, reduction='mean')
         self.l_lat = lat_loss(sigma=self.opt.sigma_lat, reduction='mean')
-
 
         # TODO: define hmc loss
         if self.opt.bayes:
@@ -81,8 +49,79 @@ class ANB:
             self.l_d_noise = noise_loss(params=self.net_Ds[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha * self.opt.lr),
                                         data_size=self.data_size)
 
+        self.schedulers = [StepLR(optimizer, step_size=1, gamma=0.1) for optimizer in self.optimizer_Gs_Adam] + \
+                          [StepLR(optimizer, step_size=1, gamma=0.1) for optimizer in self.optimizer_Gs] +\
+                          [StepLR(optimizer, step_size=1, gamma=0.1) for optimizer in self.optimizer_Ds_Adam] + \
+                          [StepLR(optimizer, step_size=1, gamma=0.1) for optimizer in self.optimizer_Ds]
+
+    def generator_setup(self):
+        self.net_Gs = []
+        self.optimizer_Gs_Adam = []
+        self.optimizer_Gs = []
+
+        net_G = Generator(self.opt).to(self.device)
+        optimizer_G_Adam = torch.optim.Adam(net_G.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+        optimizer_G = torch.optim.SGD(net_G.parameters(),
+                                              lr=self.opt.lr, momentum=0.9,
+                                              nesterov=True)
+
+        self.net_Gs.append(net_G)
+        self.optimizer_Gs_Adam.append(optimizer_G_Adam)
+        self.optimizer_Gs.append(optimizer_G)
+
+        if self.opt.bayes:
+            self.net_Gs[0].apply(weights_init)
+            for _idxmc in range(1, self.opt.n_MC_Gen):
+                net_G = Generator(self.opt).to(self.device)
+                # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
+                net_G.apply(weights_init)
+                optimizer_G_Adam = torch.optim.Adam(net_G.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+                optimizer_G = torch.optim.SGD(net_G.parameters(),
+                                              lr=self.opt.lr, momentum=0.9,
+                                              nesterov=True, weight_decay=1e-4)
+                self.net_Gs.append(net_G)
+                self.optimizer_Gs_Adam.append(optimizer_G_Adam)
+                self.optimizer_Gs.append(optimizer_G)
+
+
+    def discriminator_setup(self):
+        self.net_Ds = []
+        self.optimizer_Ds_Adam = []
+        self.optimizer_Ds = []
+
+        net_D = Discriminator(self.opt).to(self.device)
+        optimizer_D_Adam = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+        optimizer_D = torch.optim.SGD(net_D.parameters(),
+                                              lr=self.opt.lr, momentum=0.9,
+                                              nesterov=True, weight_decay=1e-4)
+
+        self.net_Ds.append(net_D)
+        self.optimizer_Ds_Adam.append(optimizer_D_Adam)
+        self.optimizer_Ds.append(optimizer_D)
+
+        if self.opt.bayes:
+            self.net_Ds[0].apply(weights_init)
+            for _idxmc in range(1, self.opt.n_MC_Disc):
+                net_D = Discriminator(self.opt).to(self.device)
+                # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
+                net_D.apply(weights_init)
+                optimizer_D_Adam = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
+                optimizer_D = torch.optim.SGD(net_D.parameters(),
+                                              lr=self.opt.lr, momentum=0.9,
+                                              nesterov=True, weight_decay=1e-4)
+                self.net_Ds.append(net_D)
+                self.optimizer_Ds_Adam.append(optimizer_D_Adam)
+                self.optimizer_Ds.append(optimizer_D)
+
     def train_epoch(self, i_epoch):
         for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))):
+            self.global_iter += 1
+            if self.global_iter == self.opt.warm_up:
+                print("Switching to user-specified optimizer")
+                self.optims = {
+                    "gen": self.optimizer_Gs,
+                    "disc": self.optimizer_Ds
+                }
             errors = OrderedDict([
                 ('err_d', []),
                 ('err_g', []),
@@ -123,7 +162,7 @@ class ANB:
 
                 err_d_total_loss /= self.opt.n_MC_Gen
                 err_d_total_loss.backward()
-                self.optimizer_Ds[_idxD].step()
+                self.optims['disc'][_idxD].step()
                 errors['err_d'].append(err_d_total_loss.detach())
                 errors['err_d_lat'].append(err_g_total_lat.detach().reshape([1]))
 
@@ -159,19 +198,12 @@ class ANB:
                         err_g_fake += self.l_g_noise(self.net_Gs[_idxG].parameters()) + \
                                       self.l_g_prior(self.net_Gs[_idxG].parameters())
                     err_g_total_loss += err_g_fake
-                # for err_g_fake, err_g_lat in zip(err_g_fakes, err_g_lats):
-                #     err_g_loss = err_g_fake + err_g_lat
-                #     err_g_total_lat += err_g_lat
-                #     if self.opt.bayes:
-                #         err_g_loss += self.l_g_noise(self.net_Gs[_idxG].parameters()) + \
-                #                       self.l_g_prior(self.net_Gs[_idxG].parameters())
-                #     err_g_total_loss += err_g_loss
 
                 err_g_total_loss /= self.opt.n_MC_Disc
                 err_g_total_loss += err_g_con
                 # err_g_total_loss.backward(retain_graph=True)
                 err_g_total_loss.backward()
-                self.optimizer_Gs[_idxG].step()
+                self.optims['gen'][_idxG].step()
 
                 errors['err_g'].append(err_g_total_loss.detach())
                 # errors['err_g_lat'].append(err_g_total_lat.detach())
@@ -188,7 +220,7 @@ class ANB:
                     self.visualizer.plot_current_errors(i_epoch, counter_ratio, errors)
 
             if epoch_iter % self.opt.save_image_freq == 0:
-                reals, fakes = x_real[0:1], torch.cat([net_G(x_real[0:1]).detach() for net_G in self.net_Gs], dim=0)
+                reals, fakes = x_real, torch.cat([net_G(x_real).detach() for net_G in self.net_Gs], dim=0)
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
@@ -202,6 +234,8 @@ class ANB:
             self.train_epoch(epoch)
             self.test_epoch(epoch)
             self.save_weight(epoch)
+            for scheduler in self.schedulers:
+                scheduler.step()
 
     def save_weight(self, epoch):
         for _idx, net_G in enumerate(self.net_Gs):

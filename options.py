@@ -34,7 +34,7 @@ class Options():
         self.parser.add_argument('--device', type=str, default='gpu', help='Device: gpu | cpu')
         self.parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self.parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
-        self.parser.add_argument('--name', type=str, default='non_bayesian', help='name of the experiment')
+        self.parser.add_argument('--name', type=str, default='exp1', help='name of the experiment')
         self.parser.add_argument('--model', type=str, default='abnomalGAN', help='chooses which model to use. ganomaly')
         self.parser.add_argument('--display_server', type=str, default="http://localhost", help='visdom server of the web display')
         self.parser.add_argument('--display_port', type=int, default=8097, help='visdom port of the web display')
@@ -45,10 +45,11 @@ class Options():
         self.parser.add_argument('--manualseed', default=-1, type=int, help='manual seed')
         self.parser.add_argument('--abnormal_class', default='0', help='Anomaly class idx for mnist and cifar datasets')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric.')
-        self.parser.add_argument('--bayes', action='store_true', default=False, help='Drop last batch size.')
-        self.parser.add_argument('--n_MC_Gen', type=int, default=1, help='number of Generator parameters')
-        self.parser.add_argument('--n_MC_Disc', type=int, default=1, help='number of Discriminator parameters')
-        self.parser.add_argument('--noise_alpha', type=float, default=0.001, help='SGHMC friction and noise')
+        self.parser.add_argument('--bayes', action='store_true', default=True, help='Drop last batch size.')
+        self.parser.add_argument('--n_MC_Gen', type=int, default=3, help='number of Generator parameters')
+        self.parser.add_argument('--n_MC_Disc', type=int, default=3, help='number of Discriminator parameters')
+        self.parser.add_argument('--noise_alpha', type=float, default=0.01, help='SGHMC friction and noise')
+        self.parser.add_argument('--warm_up', type=int, default=1000, help='number of iteration that use Adam optimizer')
 
         ##
         # Train
@@ -62,10 +63,10 @@ class Options():
         self.parser.add_argument('--niter', type=int, default=15, help='number of epochs to train for')
         self.parser.add_argument('--niter_decay', type=int, default=100, help='# of iter to linearly decay learning rate to zero')
         self.parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
-        self.parser.add_argument('--lr', type=float, default=0.002, help='initial learning rate for adam')
+        self.parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate for adam')
 
-        self.parser.add_argument('--sigma_lat', type=float, default=1, help='Weight for reconstruction loss. default=1')
-        self.parser.add_argument('--scale_con', type=float, default=0.02, help='Weight for latent space loss. default=0.02')
+        self.parser.add_argument('--sigma_lat', type=float, default=1, help='Weight for latent space loss. default=1')
+        self.parser.add_argument('--scale_con', type=float, default=0.02, help='Weight for reconstruction loss. default=0.02')
         self.parser.add_argument('--w_adv', type=float, default=1, help='Weight for adversarial loss. default=1')
         # self.parser.add_argument('--w_con', type=float, default=50, help='Weight for reconstruction loss. default=50')
         # self.parser.add_argument('--w_lat', type=float, default=1, help='Weight for latent space loss. default=1')
