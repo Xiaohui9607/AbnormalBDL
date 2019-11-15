@@ -5,6 +5,7 @@ import pandas as pd
 from torch import nn
 from tqdm import tqdm
 import seaborn as sns
+import random
 import matplotlib.pyplot as plt
 from models.evaluate import roc
 from collections import OrderedDict
@@ -212,15 +213,17 @@ class ANB:
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
-            if self.opt.save_weight:
-                for _idx, net_G in enumerate(self.net_Gs):
-                    torch.save(net_G.state_dict(),
-                               '{0}/{1}/train/weights/Net_G_{2}_epoch_{3}_iter_{4}.pth'.format(self.opt.outf, self.opt.name,
-                                                                                               _idx, i_epoch, iter))
 
-                for _idx, net_D in enumerate(self.net_Ds):
-                    torch.save(net_D.state_dict(),
-                               '{0}/{1}/train/weights/Net_D_{2}_epoch_{3}_iter_{4}.pth'.format(self.opt.outf, self.opt.name,
+            if self.opt.save_weight and self.global_iter > self.opt.warm_up:
+                if random.uniform(0, 1) < 0.2:
+                    for _idx, net_G in enumerate(self.net_Gs):
+                        torch.save(net_G.state_dict(),
+                                   '{0}/{1}/train/weights/Net_G_{2}_epoch_{3}_iter_{4}.pth'.format(self.opt.outf, self.opt.name,
+                                                                                                   _idx, i_epoch, iter))
+
+                    for _idx, net_D in enumerate(self.net_Ds):
+                        torch.save(net_D.state_dict(),
+                                   '{0}/{1}/train/weights/Net_D_{2}_epoch_{3}_iter_{4}.pth'.format(self.opt.outf, self.opt.name,
                                                                                                _idx, i_epoch, iter))
     # def train_epoch_ramdom_batching(self, i_epoch):
     #     pass
@@ -232,9 +235,9 @@ class ANB:
         for epoch in range(self.opt.niter):
             self.train_epoch(epoch)
             self.test_epoch(epoch)
-            self.save_weight(epoch)
-            for scheduler in self.schedulers:
-                scheduler.step()
+            # self.save_weight(epoch)
+            # for scheduler in self.schedulers:
+            #     scheduler.step()
 
     def save_weight(self, epoch):
         for _idx, net_G in enumerate(self.net_Gs):
