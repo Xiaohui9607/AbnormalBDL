@@ -50,7 +50,7 @@ class Options():
         self.parser.add_argument('--n_MC_Disc', type=int, default=3, help='number of Discriminator parameters')
         self.parser.add_argument('--noise_alpha', type=float, default=0.01, help='SGHMC friction and noise')
         self.parser.add_argument('--warm_up', type=int, default=1000, help='number of iteration that use Adam optimizer')
-
+        self.parser.add_argument('--save_weight', action='store_true', help='Save weight in each iteration')
         ##
         # Train
         self.parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
