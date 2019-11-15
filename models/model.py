@@ -25,34 +25,32 @@ class ANB:
         self.visualizer = Visualizer(opt)
         self.device = 'cpu' if not self.opt.gpu_ids else 'cuda'
         self.global_iter = 0
+        self.sgd_lr = self.opt.lr / 10.0
+        self.adam_lr = self.opt.lr
 
         self.rocs = []
-        # TODO: initialize network and optimizer
-        self.generator_setup()
-        self.discriminator_setup()
-        self.optims = {
-            "gen": self.optimizer_Gs_Adam,
-            "disc": self.optimizer_Ds_Adam
-        }
-        # TODO: define discriminator loss function
-        self.l_adv = nn.BCELoss(reduction='mean')
-        self.l_con = con_loss(b=self.opt.scale_con, reduction='mean')
-        self.l_lat = lat_loss(sigma=self.opt.sigma_lat, reduction='mean')
+        if self.opt.phase == 'train':
+            # TODO: initialize network and optimizer
+            self.generator_setup()
+            self.discriminator_setup()
+            self.optims = {
+                "gen": self.optimizer_Gs_Adam,
+                "disc": self.optimizer_Ds_Adam
+            }
+            # TODO: define discriminator loss function
+            self.l_adv = nn.BCELoss(reduction='mean')
+            self.l_con = con_loss(b=self.opt.scale_con, reduction='mean')
+            self.l_lat = lat_loss(sigma=self.opt.sigma_lat, reduction='mean')
 
-        # TODO: define hmc loss
-        if self.opt.bayes:
-            self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size)
-            self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha * self.opt.lr),
-                                        data_size=self.data_size)
+            # TODO: define hmc loss
+            if self.opt.bayes:
+                self.l_g_prior = prior_loss(prior_std=1., data_size=self.data_size)
+                self.l_g_noise = noise_loss(params=self.net_Gs[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha * self.opt.lr),
+                                            data_size=self.data_size)
 
-            self.l_d_prior = prior_loss(prior_std=1, data_size=self.data_size)
-            self.l_d_noise = noise_loss(params=self.net_Ds[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha * self.opt.lr),
-                                        data_size=self.data_size)
-
-        self.schedulers = [StepLR(optimizer, step_size=1, gamma=0.1) for optimizer in self.optimizer_Gs_Adam] + \
-                          [StepLR(optimizer, step_size=1, gamma=0.1) for optimizer in self.optimizer_Gs] +\
-                          [StepLR(optimizer, step_size=1, gamma=0.1) for optimizer in self.optimizer_Ds_Adam] + \
-                          [StepLR(optimizer, step_size=1, gamma=0.1) for optimizer in self.optimizer_Ds]
+                self.l_d_prior = prior_loss(prior_std=1, data_size=self.data_size)
+                self.l_d_noise = noise_loss(params=self.net_Ds[0].parameters(), scale=math.sqrt(2 * self.opt.noise_alpha * self.opt.lr),
+                                            data_size=self.data_size)
 
     def generator_setup(self):
         self.net_Gs = []
@@ -60,10 +58,8 @@ class ANB:
         self.optimizer_Gs = []
 
         net_G = Generator(self.opt).to(self.device)
-        optimizer_G_Adam = torch.optim.Adam(net_G.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
-        optimizer_G = torch.optim.SGD(net_G.parameters(),
-                                              lr=self.opt.lr, momentum=0.9,
-                                              nesterov=True)
+        optimizer_G_Adam = torch.optim.Adam(net_G.parameters(), lr=self.adam_lr, betas=(self.opt.beta1, 0.999))
+        optimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.sgd_lr)
 
         self.net_Gs.append(net_G)
         self.optimizer_Gs_Adam.append(optimizer_G_Adam)
@@ -75,14 +71,11 @@ class ANB:
                 net_G = Generator(self.opt).to(self.device)
                 # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
                 net_G.apply(weights_init)
-                optimizer_G_Adam = torch.optim.Adam(net_G.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
-                optimizer_G = torch.optim.SGD(net_G.parameters(),
-                                              lr=self.opt.lr, momentum=0.9,
-                                              nesterov=True, weight_decay=1e-4)
+                optimizer_G_Adam = torch.optim.Adam(net_G.parameters(), lr=self.adam_lr, betas=(self.opt.beta1, 0.999))
+                optimizer_G = torch.optim.SGD(net_G.parameters(), lr=self.sgd_lr)
                 self.net_Gs.append(net_G)
                 self.optimizer_Gs_Adam.append(optimizer_G_Adam)
                 self.optimizer_Gs.append(optimizer_G)
-
 
     def discriminator_setup(self):
         self.net_Ds = []
@@ -90,10 +83,8 @@ class ANB:
         self.optimizer_Ds = []
 
         net_D = Discriminator(self.opt).to(self.device)
-        optimizer_D_Adam = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
-        optimizer_D = torch.optim.SGD(net_D.parameters(),
-                                              lr=self.opt.lr, momentum=0.9,
-                                              nesterov=True, weight_decay=1e-4)
+        optimizer_D_Adam = torch.optim.Adam(net_D.parameters(), lr=self.adam_lr, betas=(self.opt.beta1, 0.999))
+        optimizer_D = torch.optim.SGD(net_D.parameters(), lr=self.sgd_lr)
 
         self.net_Ds.append(net_D)
         self.optimizer_Ds_Adam.append(optimizer_D_Adam)
@@ -105,10 +96,8 @@ class ANB:
                 net_D = Discriminator(self.opt).to(self.device)
                 # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
                 net_D.apply(weights_init)
-                optimizer_D_Adam = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
-                optimizer_D = torch.optim.SGD(net_D.parameters(),
-                                              lr=self.opt.lr, momentum=0.9,
-                                              nesterov=True, weight_decay=1e-4)
+                optimizer_D_Adam = torch.optim.Adam(net_D.parameters(), lr=self.adam_lr, betas=(self.opt.beta1, 0.999))
+                optimizer_D = torch.optim.SGD(net_D.parameters(), lr=self.sgd_lr)
                 self.net_Ds.append(net_D)
                 self.optimizer_Ds_Adam.append(optimizer_D_Adam)
                 self.optimizer_Ds.append(optimizer_D)
@@ -165,7 +154,6 @@ class ANB:
                 self.optims['disc'][_idxD].step()
                 errors['err_d'].append(err_d_total_loss.detach())
                 errors['err_d_lat'].append(err_g_total_lat.detach().reshape([1]))
-
 
             # TODO update each gen with all discs
             for _idxG in range(self.opt.n_MC_Gen):
@@ -224,7 +212,18 @@ class ANB:
                 self.visualizer.save_current_images(i_epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
+            if self.opt.save_weight:
+                for _idx, net_G in enumerate(self.net_Gs):
+                    torch.save(net_G.state_dict(),
+                               '{0}/{1}/train/weights/Net_G_{2}_epoch_{3}_iter_{4}.pth'.format(self.opt.outf, self.opt.name,
+                                                                                               _idx, i_epoch, iter))
 
+                for _idx, net_D in enumerate(self.net_Ds):
+                    torch.save(net_D.state_dict(),
+                               '{0}/{1}/train/weights/Net_D_{2}_epoch_{3}_iter_{4}.pth'.format(self.opt.outf, self.opt.name,
+                                                                                               _idx, i_epoch, iter))
+    # def train_epoch_ramdom_batching(self, i_epoch):
+    #     pass
     def train(self):
         for net_D in self.net_Ds:
             net_D.train()
@@ -339,8 +338,29 @@ class ANB:
                 plt.savefig("{0}/{1}/test/plots/sns_at_epoch{2}.png".format(self.opt.outf, self.opt.name, epoch))
                 plt.close()
 
+    def inference(self):
+        for net_G in self.net_Gs:
+            #TODO
+            pass
+            for net_D in self.net_Ds:
+                #TODO
+                pass
 
     def load_weight(self, pathlist:dict):
-        pass
+        self.net_Gs = []
+        self.net_Ds = []
+        for weight in pathlist['net_G']:
+            net_G = Generator(self.opt)
+            net_G.load(torch.load(weight))
+            self.net_Gs.append(net_G)
+        for weight in pathlist['net_D']:
+            net_D = Discriminator(self.opt)
+            net_D.load(torch.load(weight))
+            self.net_Ds.append(net_D)
+
+
+
+
+
 
 
