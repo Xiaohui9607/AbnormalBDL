@@ -251,27 +251,30 @@ class ANB:
 
             self.opt.phase = 'test'
 
-            mean = []
-            var = []
-            an_scores = torch.zeros(size=(len(self.dataloader.valid.dataset), self.opt.n_MC_Gen * self.opt.n_MC_Disc),
-                                    dtype=torch.float32,
-                                    device=self.device)
+            # mean = []
+            # var = []
+            # an_scores = torch.zeros(size=(len(self.dataloader.valid.dataset), self.opt.n_MC_Gen * self.opt.n_MC_Disc),
+            #                         dtype=torch.float32,
+            #                         device=self.device)
+            means = [torch.zeros(size=(len(self.dataloader.valid.dataset), self.opt.n_MC_Gen), dtype=torch.float32,
+                                device=self.device) for _ in range(self.opt.n_MC_Disc)]
             gt_labels = torch.zeros(size=(len(self.dataloader.valid.dataset),),
-                                         dtype=torch.long, device=self.device)
+                                    dtype=torch.long, device=self.device)
 
             # total_steps = 0
             # epoch_iter = 0
-            for i, (x_real, label) in enumerate(self.dataloader.valid, 0):
+
+            for _idxData, (x_real, label) in enumerate(self.dataloader.valid, 0):
                 # total_steps += self.opt.batchsize
                 # epoch_iter += self.opt.batchsize
                 x_real = x_real.to(self.device)
 
-                gt_labels[i * self.opt.batchsize: i * self.opt.batchsize + label.size(0)] = label
-                for j in range(self.opt.n_MC_Disc):
-                    pred_real, feat_real = self.net_Ds[j](x_real)
-                    for k in range(self.opt.n_MC_Gen):
-                        x_fake = self.net_Gs[k](x_real)
-                        pred_fake, feat_fake = self.net_Ds[j](x_fake)
+                gt_labels[_idxData * self.opt.batchsize: _idxData * self.opt.batchsize + label.size(0)] = label
+                for _idxD in range(self.opt.n_MC_Disc):
+                    pred_real, feat_real = self.net_Ds[_idxD](x_real)
+                    for _idxG in range(self.opt.n_MC_Gen):
+                        x_fake = self.net_Gs[_idxG](x_real)
+                        pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
 
                         # Calculate the anomaly score.
                         # si = x_real.size()
@@ -281,20 +284,21 @@ class ANB:
                         # rec = torch.mean(torch.pow(rec, 2), dim=1)
                         lat = torch.mean(torch.pow(lat, 2), dim=1)
                         # error = 0.9 * rec + 0.1 * lat
-                        error = lat
+                        means[_idxD][_idxData * self.opt.batchsize:(_idxData+1)*self.opt.batchsize, _idxG].copy_(lat)
 
+                        # an_scores[i * self.opt.batchsize: i * self.opt.batchsize + error.size(0),
+                        # j * (self.opt.n_MC_Gen - 1) + k] = error.reshape(
+                        #     error.size(0))
+            vars = [torch.var(mean, dim=1, keepdim=True) for mean in means]
+            means = [torch.mean(mean, dim=1, keepdim=True) for mean in means]
+            vars = torch.mean(torch.cat([var + torch.pow(mean, 2) for var, mean in zip(vars, means)], dim=1), dim=1)
+            means = torch.mean(torch.cat(means, dim=1), dim=1)
+            vars = vars - torch.pow(means, 2)
 
-                        an_scores[i * self.opt.batchsize: i * self.opt.batchsize + error.size(0),
-                        j * (self.opt.n_MC_Gen - 1) + k] = error.reshape(
-                            error.size(0))
+            means = means.cpu()
+            vars = vars.cpu()
 
-            test_mean = torch.mean(an_scores, dim=1)
-            test_var = torch.var(an_scores, dim=1)
-
-            mean.append(test_mean.cpu())
-            var.append(test_var.cpu())
-
-            per_scores = mean[-1]
+            per_scores = means
             per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
             auc = roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
                                                                             "test/plots/mean_at_epoch{0}.png".format(epoch)))
@@ -306,17 +310,17 @@ class ANB:
                 plt.ion()
                 # Create data frame for scores and labels.
                 scores = {}
-                scores['scores'] = mean[-1]
+                scores['scores'] = means
                 scores['labels'] = gt_labels.cpu()
                 hist = pd.DataFrame.from_dict(scores)
                 hist.to_csv("{0}/{1}/test/plots/mean_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
                 re_var = {}
-                re_var['var'] = var[-1]
+                re_var['var'] = vars
                 re_var['labels'] = gt_labels.cpu()
                 hist_v = pd.DataFrame.from_dict(re_var)
                 hist_v.to_csv("{0}/{1}/test/plots/var_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
                 all_scores = {}
-                record_scores = an_scores.cpu()
+                record_scores = means
 
                 for j in range(self.opt.n_MC_Disc):
                     for k in range(self.opt.n_MC_Gen):
