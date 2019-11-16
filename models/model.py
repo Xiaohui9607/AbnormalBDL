@@ -26,7 +26,7 @@ class ANB:
         self.visualizer = Visualizer(opt)
         self.device = 'cpu' if not self.opt.gpu_ids else 'cuda'
         self.global_iter = 0
-        self.sgd_lr = self.opt.lr / 10.0
+        self.sgd_lr = self.opt.lr / 5.0
         self.adam_lr = self.opt.lr
 
         self.rocs = []
@@ -261,12 +261,7 @@ class ANB:
             gt_labels = torch.zeros(size=(len(self.dataloader.valid.dataset),),
                                     dtype=torch.long, device=self.device)
 
-            # total_steps = 0
-            # epoch_iter = 0
-
             for _idxData, (x_real, label) in enumerate(self.dataloader.valid, 0):
-                # total_steps += self.opt.batchsize
-                # epoch_iter += self.opt.batchsize
                 x_real = x_real.to(self.device)
 
                 gt_labels[_idxData * self.opt.batchsize: _idxData * self.opt.batchsize + label.size(0)] = label
@@ -320,12 +315,12 @@ class ANB:
                 hist_v = pd.DataFrame.from_dict(re_var)
                 hist_v.to_csv("{0}/{1}/test/plots/var_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
                 all_scores = {}
-                record_scores = means
+                # record_scores = means
 
-                for j in range(self.opt.n_MC_Disc):
-                    for k in range(self.opt.n_MC_Gen):
-                        all_scores['Dis #{0}, Gen #{1}'.format(j, k)] = record_scores[:,
-                                                                        j * (self.opt.n_MC_Gen - 1) + k]
+                # for j in range(self.opt.n_MC_Disc):
+                #     for k in range(self.opt.n_MC_Gen):
+                #         all_scores['Dis #{0}, Gen #{1}'.format(j, k)] = record_scores[:,
+                #                                                         j * (self.opt.n_MC_Gen - 1) + k]
                 all_scores['labels'] = gt_labels.cpu()
                 hist_r = pd.DataFrame.from_dict(all_scores)
                 hist_r.to_csv("{0}/{1}/test/plots/scores_for_all_combination_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
@@ -357,12 +352,12 @@ class ANB:
         self.net_Gs = []
         self.net_Ds = []
         for weight in pathlist['net_G']:
-            net_G = Generator(self.opt)
-            net_G.load(torch.load(weight))
+            net_G = Generator(self.opt).to(self.device)
+            net_G.load_state_dict(torch.load(weight))
             self.net_Gs.append(net_G)
         for weight in pathlist['net_D']:
-            net_D = Discriminator(self.opt)
-            net_D.load(torch.load(weight))
+            net_D = Discriminator(self.opt).to(self.device)
+            net_D.load_state_dict(torch.load(weight))
             self.net_Ds.append(net_D)
 
 

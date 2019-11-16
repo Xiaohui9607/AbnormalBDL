@@ -1,3 +1,4 @@
+import glob
 from options import Options
 from models.model import ANB
 
@@ -7,11 +8,11 @@ def main():
     opt = Options().parse()
     model = ANB(opt)
     weights = {
-        'net_G':[],
-        'net_D':[]
+        'net_G': glob.glob("/home/golf/code/AbnormalBDL/output/exp3/train/weights/Net_G*"),
+        'net_D': glob.glob("/home/golf/code/AbnormalBDL/output/exp3/train/weights/Net_D*")
     }
-    model.load_weight()
-    result = model.inference()
+    model.load_weight(weights)
+    model.test_epoch(5)
 
 
 if __name__ == '__main__':
