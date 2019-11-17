@@ -2,10 +2,13 @@ import glob
 from options import Options
 from models.model import ANB
 
+
 def main():
     """ Testing
     """
     opt = Options().parse()
+    opt.phase = "test"
+
     model = ANB(opt)
     weights = {
         'net_G': glob.glob("/home/golf/code/AbnormalBDL/output/exp3/train/weights/Net_G*"),
