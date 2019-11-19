@@ -61,13 +61,12 @@ def load_data(opt):
 
     # FOLDER
 
-
     elif opt.dataset in ['OCT']:
         # TODO: fix the OCT dataset into the dataloader and return
-        transform = transforms.Compose([transforms.Resize(opt.isize),
+        transform = transforms.Compose([transforms.Grayscale(),
+                                        transforms.Resize(opt.isize),
                                         transforms.CenterCrop(opt.isize),
-                                        transforms.ToTensor(),
-                                        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)), ])
+                                        transforms.ToTensor(),])
 
         train_ds = ImageFolder(os.path.join(opt.dataroot, 'train'), transform)
         valid_ds = ImageFolder(os.path.join(opt.dataroot, 'test'), transform)

@@ -114,6 +114,8 @@ class ANB:
 
     def train_epoch(self, epoch):
         # for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))):
+        loss_D = [{'err_d': 0, 'err_d_lat': 0} for _ in range(self.opt.n_MC_Disc)]
+        loss_G = [{'err_g': 0, 'err_g_con': 0} for _ in range(self.opt.n_MC_Gen)]
 
         for _iter in tqdm(range(len(self.dataloader["gen"][0].train)), leave=False, total=len(self.dataloader["gen"][0].train)):
             self.global_iter += 1
@@ -129,10 +131,9 @@ class ANB:
                 ('err_g_con', []),
                 ('err_d_lat', [])])
 
-            # x_real = x_real.to(self.device)
             for _idxD in range(self.opt.n_MC_Disc):
                 x_real, _ = next(iter(self.dataloader["disc"][_idxD].train))
-                x_real.to(self.device)
+                x_real = x_real.to(self.device)
                 # TODO update each disc with all gens
                 self.net_Ds[_idxD].zero_grad()
                 label_real = torch.ones(x_real.shape[0]).to(self.device)
@@ -174,7 +175,7 @@ class ANB:
             # TODO update each gen with all discs
             for _idxG in range(self.opt.n_MC_Gen):
                 x_real, _ = next(iter(self.dataloader["gen"][_idxG].train))
-                x_real.to(self.device)
+                x_real = x_real.to(self.device)
 
                 self.net_Gs[_idxG].zero_grad()
 
