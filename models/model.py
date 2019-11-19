@@ -136,7 +136,7 @@ class ANB:
                 err_d_real = self.l_adv(pred_real, label_real)
 
                 err_d_fakes = []
-                err_d_lats = []
+                # err_d_lats = []
 
                 for _idxG in range(self.opt.n_MC_Gen):
                     # self.net_Gs[_idxG].zero_grad()
@@ -150,7 +150,7 @@ class ANB:
                     # err_d_lats.append(err_d_lat)
 
                 err_d_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
-                for err_d_fake, err_d_lat in zip(err_d_fakes, err_d_lats):
+                for err_d_fake in err_d_fakes:
                     err_d_loss = err_d_fake + err_d_real
                     err_d_total_loss += err_d_loss
 
