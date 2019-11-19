@@ -112,9 +112,6 @@ class ANB:
                 self.optimizer_Ds.append(optimizer_D)
 
     def train_epoch(self, epoch):
-        loss_D = [{'err_d': 0, 'err_d_lat': 0} for _ in range(self.opt.n_MC_Disc)]
-        loss_G = [{'err_g': 0, 'err_g_con': 0} for _ in range(self.opt.n_MC_Gen)]
-
         for _iter in tqdm(range(len(self.dataloader["gen"][0].train)), leave=False, total=len(self.dataloader["gen"][0].train)):
             self.global_iter += 1
             if self.global_iter == self.opt.warm_up:
@@ -149,18 +146,13 @@ class ANB:
                     err_d_fake = self.l_adv(pred_fake, label_fake)
                     err_d_fakes.append(err_d_fake)
 
-                    err_d_lat = self.l_lat(feat_real, feat_fake)
-                    err_d_lats.append(err_d_lat)
+                    # err_d_lat = self.l_lat(feat_real, feat_fake)
+                    # err_d_lats.append(err_d_lat)
 
                 err_d_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
-                err_g_total_lat = torch.zeros([1, ], dtype=torch.float32).to(self.device)
                 for err_d_fake, err_d_lat in zip(err_d_fakes, err_d_lats):
-                    err_d_loss = err_d_fake + err_d_real + err_d_lat
-                    if self.opt.bayes:
-                        err_d_loss += self.l_d_noise(self.net_Ds[_idxD].parameters()) + \
-                                      self.l_d_prior(self.net_Ds[_idxD].parameters())
+                    err_d_loss = err_d_fake + err_d_real
                     err_d_total_loss += err_d_loss
-                    err_g_total_lat += err_d_lat
 
                 err_d_total_loss /= self.opt.n_MC_Gen
 
@@ -168,7 +160,6 @@ class ANB:
                 self.optims['disc'][_idxD].step()
 
                 errors['err_d'].append(err_d_total_loss.detach())
-                errors['err_d_lat'].append(err_g_total_lat.detach().reshape([1]))
 
             # TODO update each gen with all discs
             for _idxG in range(self.opt.n_MC_Gen):
@@ -183,7 +174,6 @@ class ANB:
                 err_g_fakes = []
 
                 for _idxD in range(self.opt.n_MC_Disc):
-                    # self.net_Ds[_idxD].zero_grad()        # is it necessary?
                     _, feat_real = self.net_Ds[_idxD](x_real)
                     x_fake = self.net_Gs[_idxG](x_real)
                     pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
@@ -195,10 +185,6 @@ class ANB:
                 err_g_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
 
                 for err_g_fake in err_g_fakes:
-
-                    if self.opt.bayes:
-                        err_g_fake += self.l_g_noise(self.net_Gs[_idxG].parameters()) + \
-                                      self.l_g_prior(self.net_Gs[_idxG].parameters())
                     err_g_total_loss += err_g_fake
 
                 err_g_total_loss /= self.opt.n_MC_Disc
@@ -215,7 +201,6 @@ class ANB:
             # ploting
             if epoch_iter % self.opt.print_freq == 0:
                 errors['err_g'] = torch.mean(torch.cat(errors['err_g'])).item()
-                errors['err_d_lat'] = torch.mean(torch.cat(errors['err_d_lat'])).item()
                 errors['err_g_con'] = torch.mean(torch.cat(errors['err_g_con'])).item()
                 errors['err_d'] = torch.mean(torch.cat(errors['err_d'])).cpu().item()
                 if self.opt.display:
@@ -229,7 +214,7 @@ class ANB:
                     self.visualizer.display_current_images(reals, fakes)
 
             # sampling weight
-            if self.opt.save_weight and self.global_iter > self.opt.warm_up:
+            if self.opt.save_weight and self.global_iter > self.opt.warm_up and self.opt.bayes:
                 if random.uniform(0, 1) < 0.05:
                     for _idx, net_G in enumerate(self.net_Gs):
                         torch.save(net_G.state_dict(),
@@ -249,6 +234,7 @@ class ANB:
         for epoch in range(self.opt.niter):
             self.train_epoch(epoch)
             self.test_epoch(epoch)
+            self.save_weight(epoch)
 
     def save_weight(self, epoch):
         for _idx, net_G in enumerate(self.net_Gs):

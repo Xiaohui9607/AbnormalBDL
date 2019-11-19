@@ -46,12 +46,12 @@ class Options():
         self.parser.add_argument('--manualseed', default=-1, type=int, help='manual seed')
         self.parser.add_argument('--abnormal_class', default='0', help='Anomaly class idx for mnist and cifar datasets')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric.')
-        self.parser.add_argument('--bayes', action='store_true', default=True, help='Drop last batch size.')
-        self.parser.add_argument('--n_MC_Gen', type=int, default=3, help='number of Generator parameters')
-        self.parser.add_argument('--n_MC_Disc', type=int, default=3, help='number of Discriminator parameters')
+        self.parser.add_argument('--bayes', action='store_true', default=False, help='Drop last batch size.')
+        self.parser.add_argument('--n_MC_Gen', type=int, default=1, help='number of Generator parameters')
+        self.parser.add_argument('--n_MC_Disc', type=int, default=1, help='number of Discriminator parameters')
         self.parser.add_argument('--noise_alpha', type=float, default=0.01, help='SGHMC friction and noise')
         self.parser.add_argument('--warm_up', type=int, default=2000, help='number of iteration that use Adam optimizer')
-        self.parser.add_argument('--save_weight', action='store_true', default=True, help='Save weight in each iteration')
+        self.parser.add_argument('--save_weight', action='store_true', default=False, help='Save weight in each iteration')
         ##
         # Train
         self.parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
