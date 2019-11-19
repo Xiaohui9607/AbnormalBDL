@@ -114,12 +114,12 @@ class ANB:
     def train_epoch(self, epoch):
         for _iter in tqdm(range(len(self.dataloader["gen"][0].train)), leave=False, total=len(self.dataloader["gen"][0].train)):
             self.global_iter += 1
-            if self.global_iter == self.opt.warm_up:
-                print("Switching to user-specified optimizer")
-                self.optims = {
-                    "gen": self.optimizer_Gs,
-                    "disc": self.optimizer_Ds
-                }
+            #if self.global_iter == self.opt.warm_up:
+            #    print("Switching to user-specified optimizer")
+            #    self.optims = {
+            #        "gen": self.optimizer_Gs,
+            #        "disc": self.optimizer_Ds
+            #    }
             errors = OrderedDict([
                 ('err_d', []),
                 ('err_g', []),
@@ -150,7 +150,7 @@ class ANB:
                     # err_d_lats.append(err_d_lat)
 
                 err_d_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
-                for err_d_fake, err_d_lat in zip(err_d_fakes, err_d_lats):
+                for err_d_fake in err_d_fakes:
                     err_d_loss = err_d_fake + err_d_real
                     err_d_total_loss += err_d_loss
 
@@ -233,7 +233,7 @@ class ANB:
             net_G.train()
         for epoch in range(self.opt.niter):
             self.train_epoch(epoch)
-            self.test_epoch(epoch)
+            #self.test_epoch(epoch)
             self.save_weight(epoch)
 
     def save_weight(self, epoch):
