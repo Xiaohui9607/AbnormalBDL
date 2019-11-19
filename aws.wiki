@@ -14,3 +14,9 @@
 sshpass -p "PASSWORD" ssh -o StrictHostKeyChecking=no -X -N -f -L localhost:8097:localhost:8097  [TUFTS_EECS_USERNAME]@aws-gpu-2.eecs.tufts.edu
 3. access localhost:8097 in local browser
 
+# open the jupyter(so you can modify file, see result in browser)
+1. jupyter notebook, then it gives you a token in "The Jupyter Notebook is running at: http://localhost:8888/?token=04c7bc2df045a3429f103214be6bf27ba6bd527ab79d0190"
+2. bind the server port to local port by running the the following command(in local!!!)
+sshpass -p "PASSWORD" ssh -o StrictHostKeyChecking=no -X -N -f -L localhost:8888:localhost:8888  [TUFTS_EECS_USERNAME]@aws-gpu-2.eecs.tufts.edu
+3. access localhost:8888 in local browser and use your token to login
+
