@@ -23,7 +23,6 @@ class ANB:
         self.opt = opt
         assert self.opt.batchsize % self.opt.split == 0, "#batchsize must be divisible w.r.t #split "
         self.opt.batchsize //= self.opt.split
-
         self.dataloader = {
             "gen": [load_data(self.opt) for _ in range(self.opt.n_MC_Gen)],
             "disc": [load_data(self.opt) for _ in range(self.opt.n_MC_Disc)]
@@ -113,7 +112,6 @@ class ANB:
                 self.optimizer_Ds.append(optimizer_D)
 
     def train_epoch(self, epoch):
-        # for iter, (x_real, _) in enumerate(tqdm(self.dataloader.train, leave=False, total=len(self.dataloader.train))):
         loss_D = [{'err_d': 0, 'err_d_lat': 0} for _ in range(self.opt.n_MC_Disc)]
         loss_G = [{'err_g': 0, 'err_g_con': 0} for _ in range(self.opt.n_MC_Gen)]
 
@@ -232,16 +230,16 @@ class ANB:
 
             # sampling weight
             if self.opt.save_weight and self.global_iter > self.opt.warm_up:
-                if random.uniform(0, 1) < 0.2:
+                if random.uniform(0, 1) < 0.05:
                     for _idx, net_G in enumerate(self.net_Gs):
                         torch.save(net_G.state_dict(),
                                    '{0}/{1}/train/weights/Net_G_{2}_epoch_{3}_iter_{4}.pth'.format(self.opt.outf, self.opt.name,
-                                                                                                   _idx, epoch, iter))
+                                                                                                   _idx, epoch, _iter))
 
                     for _idx, net_D in enumerate(self.net_Ds):
                         torch.save(net_D.state_dict(),
                                    '{0}/{1}/train/weights/Net_D_{2}_epoch_{3}_iter_{4}.pth'.format(self.opt.outf, self.opt.name,
-                                                                                               _idx, epoch, iter))
+                                                                                               _idx, epoch, _iter))
 
     def train(self):
         for net_D in self.net_Ds:
@@ -251,7 +249,6 @@ class ANB:
         for epoch in range(self.opt.niter):
             self.train_epoch(epoch)
             self.test_epoch(epoch)
-            # self.save_weight(epoch)
 
     def save_weight(self, epoch):
         for _idx, net_G in enumerate(self.net_Gs):
