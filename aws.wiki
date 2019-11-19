@@ -1,0 +1,16 @@
+# login setup
+1. bash
+2. source ~/anaconda3/etc/profile.d/conda.sh
+3. conda activate pytorch
+
+# train a model
+1. cd abnormalBDL
+2. python train.py --[with options]
+[e.g. python train.py --n_MC_Gen 3 --n_MC_Disc 3 ...
+
+# open the visdom server(so you can see the training process(loss, reconstructed image) locally)
+1. python -m visdom.server
+2. bind the server port to local port by running the the following command(in local!!!)
+sshpass -p "PASSWORD" ssh -o StrictHostKeyChecking=no -X -N -f -L localhost:8097:localhost:8097  [TUFTS_EECS_USERNAME]@aws-gpu-2.eecs.tufts.edu
+3. access localhost:8097 in local browser
+
