@@ -34,7 +34,7 @@ def evaluate(labels, scores, metric='roc'):
         raise NotImplementedError("Check the evaluation metric.")
 
 ##
-def roc(labels, scores,epoch, save=False):
+def roc(labels, scores, epoch, save=False):
     """Compute ROC curve and ROC area for each class"""
     fpr = dict()
     tpr = dict()
@@ -44,7 +44,7 @@ def roc(labels, scores,epoch, save=False):
     scores = scores.cpu()
 
     # True/False Positive Rates.
-    fpr, tpr, _ = roc_curve(labels, scores)
+    fpr, tpr, thresholds = roc_curve(labels, scores)
     roc_auc = auc(fpr, tpr)
 
     # Equal Error Rate
@@ -66,6 +66,7 @@ def roc(labels, scores,epoch, save=False):
         plt.close()
 
     return roc_auc
+
 
 def auprc(labels, scores):
     ap = average_precision_score(labels, scores)
