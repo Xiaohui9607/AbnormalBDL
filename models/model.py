@@ -235,7 +235,7 @@ class ANB:
 
                         lat = torch.mean(torch.pow(lat, 2), dim=1)
 
-                        means[_idxData * self.opt.batchsize:(_idxData+1)*self.opt.batchsize, _idxD, _idxG].copy_(lat)
+                        means[_idxData * self.opt.batchsize:(_idxData+1)*self.opt.batchsize, _idxG, _idxD].copy_(lat)
 
             vars_D_based = torch.var(means, dim=1, keepdim=True)
             vars_G_based = torch.var(means, dim=2, keepdim=True)

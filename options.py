@@ -34,7 +34,7 @@ class Options():
         self.parser.add_argument('--ndf', type=int, default=64)
         self.parser.add_argument('--extralayers', type=int, default=0, help='Number of extra layers on gen and disc')
         self.parser.add_argument('--device', type=str, default='gpu', help='Device: gpu | cpu')
-        self.parser.add_argument('--gpu_ids', type=str, default='-1', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        self.parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self.parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
         self.parser.add_argument('--name', type=str, default='dp2', help='name of the experiment')
         self.parser.add_argument('--model', type=str, default='abnomalGAN', help='chooses which model to use. ganomaly')
@@ -48,8 +48,8 @@ class Options():
         self.parser.add_argument('--abnormal_class', default='0', help='Anomaly class idx for mnist and cifar datasets')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric: roc | auprc')
         self.parser.add_argument('--bayes', action='store_true', default=False, help='Drop last batch size.')
-        self.parser.add_argument('--n_MC_Gen', type=int, default=5, help='number of Generator parameters')
-        self.parser.add_argument('--n_MC_Disc', type=int, default=5, help='number of Discriminator parameters')
+        self.parser.add_argument('--n_MC_Gen', type=int, default=3, help='number of Generator parameters')
+        self.parser.add_argument('--n_MC_Disc', type=int, default=3, help='number of Discriminator parameters')
         # self.parser.add_argument('--noise_alpha', type=float, default=0.01, help='SGHMC friction and noise')
         # self.parser.add_argument('--warm_up', type=int, default=2000, help='number of iteration that use Adam optimizer')
         self.parser.add_argument('--save_weight', action='store_true', default=False, help='Save weight in each iteration')
@@ -81,7 +81,6 @@ class Options():
     def parse(self):
         """ Parse Arguments.
         """
-
         self.opt = self.parser.parse_args()
         self.opt.isTrain = self.isTrain   # train or test
 
@@ -104,23 +103,47 @@ class Options():
                 print('%s: %s' % (str(k), str(v)))
             print('-------------- End ----------------')
 
-        # save to the disk
-        if self.opt.name == 'experiment_name':
-            self.opt.name = "%s/%s" % (self.opt.model, self.opt.dataset)
-        expr_dir = os.path.join(self.opt.outf, self.opt.name, 'train')
-        test_dir = os.path.join(self.opt.outf, self.opt.name, 'test')
-
-        if not os.path.isdir(expr_dir):
-            os.makedirs(expr_dir)
-            os.makedirs("{0}/weights".format(expr_dir))
-        if not os.path.isdir(test_dir):
-            os.makedirs(test_dir)
-            os.makedirs("{0}/plots".format(test_dir))
-
-        file_name = os.path.join(expr_dir, 'opt.txt')
-        with open(file_name, 'wt') as opt_file:
-            opt_file.write('------------ Options -------------\n')
-            for k, v in sorted(args.items()):
-                opt_file.write('%s: %s\n' % (str(k), str(v)))
-            opt_file.write('-------------- End ----------------\n')
+        # if self.opt.name == 'experiment_name':
+        #     self.opt.name = "%s/%s" % (self.opt.model, self.opt.dataset)
+        # expr_dir = os.path.join(self.opt.outf, self.opt.name, 'train')
+        # test_dir = os.path.join(self.opt.outf, self.opt.name, 'test')
+        #
+        # if not os.path.isdir(expr_dir):
+        #     os.makedirs(expr_dir)
+        #     os.makedirs("{0}/weights".format(expr_dir))
+        # if not os.path.isdir(test_dir):
+        #     os.makedirs(test_dir)
+        #     os.makedirs("{0}/plots".format(test_dir))
+        #
+        # file_name = os.path.join(expr_dir, 'opt.txt')
+        # with open(file_name, 'wt') as opt_file:
+        #     opt_file.write('------------ Options -------------\n')
+        #     for k, v in sorted(args.items()):
+        #         opt_file.write('%s: %s\n' % (str(k), str(v)))
+        #     opt_file.write('-------------- End ----------------\n')
         return self.opt
+
+def setup_dir(opt):
+    if opt.name == 'experiment_name':
+        opt.name = "%s/%s" % (opt.model, opt.dataset)
+    expr_dir = os.path.join(opt.outf, opt.name, 'train')
+    test_dir = os.path.join(opt.outf, opt.name, 'test')
+
+    if not os.path.isdir(expr_dir):
+        os.makedirs(expr_dir)
+        os.makedirs("{0}/weights".format(expr_dir))
+    if not os.path.isdir(test_dir):
+        os.makedirs(test_dir)
+        os.makedirs("{0}/plots".format(test_dir))
+
+    file_name = os.path.join(expr_dir, 'opt.txt')
+    with open(file_name, 'wt') as opt_file:
+        opt_file.write('------------ Options -------------\n')
+        for k, v in sorted(vars(opt).items()):
+            opt_file.write('%s: %s\n' % (str(k), str(v)))
+        opt_file.write('-------------- End ----------------\n')
+    return opt
+
+# if __name__ == '__main__':
+#     opt = Options().parse()
+#     setup_dir(opt)

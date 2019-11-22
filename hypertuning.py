@@ -1,6 +1,8 @@
 from hyperopt import pyll, hp
-from options import Options
+from options import Options, setup_dir
 from models.model import ANB
+from hyperopt import fmin, tpe
+import hyperopt
 '''
 hyperparameters that neet to be tune.
 1. batchsize
@@ -16,8 +18,11 @@ hyperparameters that neet to be tune.
 11. w_adv
 12. std_policy
 '''
+count = 0
 
 def objective(args):
+    global count
+    print(args)
     opt = Options().parse()
     opt.nz = args['nz']
     opt.lr = args['lr']
@@ -26,10 +31,12 @@ def objective(args):
     opt.n_MC_Disc = args['n_MC_Disc']
     opt.batchsize = args['batchsize']
     opt.std_policy = args['std_policy']
-
+    opt.name = "exp_%d" % count
+    setup_dir(opt)
+    count += 1
     model = ANB(opt)
     model.train()
-    return model.get_best_result()
+    return model.get_best_result(args['metric'])
 
 # define a search space
 space = {
@@ -37,11 +44,17 @@ space = {
     'nz': hp.choice('nz', [16, 32, 64, 128, 256]),
     'n_MC_Gen': hp.choice('n_MC_Gen', [3, 4, 5, 6, 7]),
     'n_MC_Disc': hp.choice('n_MC_Disc', [3, 4, 5, 6, 7]),
-    'niter': hp.choice('niter', [20, 25, 30]),
+    'niter': hp.choice('niter', [30]),
     'lr': hp.uniform('lr', 0.001, 0.0001),
-    'std_policy': hp.choice('std_policy', ['D_based', 'G_based', 'DG_based'])
+    'std_policy': hp.choice('std_policy', ['D_based', 'G_based', 'DG_based']),
+    'metric': hp.choice('metric', ['mean_metric', 'std_metric']),
          }
 
 
-from hyperopt import fmin, tpe
-best = fmin(objective, space, algo=tpe.suggest, max_evals=100)
+if __name__ == '__main__':
+    best = fmin(objective, space, algo=tpe.suggest, max_evals=100)
+    with open("hyper.txt", 'w') as f:
+        f.write("best\n")
+        f.write(best)
+        f.write("\nhyperopt.space_eval(space, best)\n")
+        f.write(hyperopt.space_eval(space, best))

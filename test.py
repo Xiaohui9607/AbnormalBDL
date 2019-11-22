@@ -1,5 +1,5 @@
 import glob
-from options import Options
+from options import Options,setup_dir
 from models.model import ANB
 
 
@@ -7,6 +7,7 @@ def main():
     """ Testing
     """
     opt = Options().parse()
+    setup_dir(opt)
     # opt.phase = "test"
 
     model = ANB(opt)
