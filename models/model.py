@@ -33,7 +33,10 @@ class ANB:
         self.visualizer = Visualizer(self.opt)
         self.device = 'cpu' if not self.opt.gpu_ids else 'cuda'
         self.global_iter = 0
-        self.rocs = []
+        self.rocs = {
+            'mean_metric':[],
+            'std_metric':[]
+        }
 
         if self.opt.phase == 'train':
             # TODO: initialize network and optimizer
@@ -266,15 +269,13 @@ class ANB:
             per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
             auc_means = roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
                                                                             "test/plots/mean_at_epoch{0}.png".format(epoch)))
-            per_scores = vars
+            per_scores = torch.sqrt(vars)
             per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
-            auc_vars = roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
+            auc_std = roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
                                                                                   "test/plots/mean_at_epoch{0}.png".format(
                                                                                       epoch)))
-            self.rocs.append({
-                "mean_metric": auc_means,
-                "var_metric": auc_vars,
-            })
+            self.rocs['mean_metric'].append(auc_means)
+            self.rocs['std_metric'].append(auc_std)
 
             # PLOT HISTOGRAM
             if plot_hist:
@@ -334,9 +335,8 @@ class ANB:
             net_D.load_state_dict(torch.load(weight))
             self.net_Ds.append(net_D)
 
-    def get_best_result(self):
-        #TODO: return the best result w.r.t std and mean metric
-        pass
+    def get_best_result(self, metric):
+        return max(self.rocs[metric])
 
 
 
