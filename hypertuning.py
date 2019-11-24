@@ -2,7 +2,9 @@ from hyperopt import pyll, hp
 from options import Options, setup_dir
 from models.model import ANB
 from hyperopt import fmin, tpe
-import hyperopt
+import ray
+from ray import tune
+from ray.tune.suggest.hyperopt import HyperOptSearch
 '''
 hyperparameters that neet to be tune.
 1. batchsize
@@ -20,6 +22,11 @@ hyperparameters that neet to be tune.
 '''
 count = 0
 
+def train_model(args):
+    for i in range(1):
+        auc = objective(args)
+        tune.track.log(mean_accuracy=auc)
+        
 def objective(args):
     global count
     print(args)
@@ -39,22 +46,21 @@ def objective(args):
     return model.get_best_result(args['metric'])
 
 # define a search space
-space = {
-    'batchsize': hp.choice("batchsize", [64, 128, 256, 512]),
-    'nz': hp.choice('nz', [16, 32, 64, 128, 256]),
-    'n_MC_Gen': hp.choice('n_MC_Gen', [3, 4, 5, 6, 7]),
-    'n_MC_Disc': hp.choice('n_MC_Disc', [3, 4, 5, 6, 7]),
-    'niter': hp.choice('niter', [30]),
-    'lr': hp.uniform('lr', 0.001, 0.0001),
-    'std_policy': hp.choice('std_policy', ['D_based', 'G_based', 'DG_based']),
-    'metric': hp.choice('metric', ['mean_metric', 'std_metric']),
-         }
 
 
 if __name__ == '__main__':
-    best = fmin(objective, space, algo=tpe.suggest, max_evals=100)
+    ray.init()
+    space = {
+        'batchsize': hp.choice("batchsize", [64, 128, 256, 512]),
+        'nz': hp.choice('nz', [16, 32, 64, 128, 256]),
+        'n_MC_Gen': hp.choice('n_MC_Gen', [3, 4, 5, 6, 7]),
+        'n_MC_Disc': hp.choice('n_MC_Disc', [3, 4, 5, 6, 7]),
+        'niter': hp.choice('niter', [1]),
+        'lr': hp.uniform('lr', 0.001, 0.0001),
+        'std_policy': hp.choice('std_policy', ['D_based', 'G_based', 'DG_based']),
+        'metric': hp.choice('metric', ['mean_metric', 'std_metric']),
+             }
+    algo = HyperOptSearch(space, max_concurrent=8, reward_attr="neg_mean_loss")
+    analysis = tune.run(train_model, name="my_exp", num_samples=5, search_alg=algo,resources_per_trial={"gpu":0.15})
     with open("hyper.txt", 'w') as f:
-        f.write("best\n")
-        f.write(best)
-        f.write("\nhyperopt.space_eval(space, best)\n")
-        f.write(hyperopt.space_eval(space, best))
+        f.write(analysis.get_best_config(metric="mean_accuracy"))

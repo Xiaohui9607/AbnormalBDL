@@ -74,14 +74,14 @@ class Options():
         # self.parser.add_argument('--w_lat', type=float, default=1, help='Weight for latent space loss. default=1')
         self.parser.add_argument('--lr_policy', type=str, default='lambda', help='lambda|step|plateau')
         self.parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
-        self.parser.add_argument('--std_policy', type=str, default='DG_based', help='D_based|G_based|DG_based')
+        self.parser.add_argument('--std_policy', type=str, default='D_based', help='D_based|G_based|DG_based')
         self.isTrain = True
         self.opt = None
 
     def parse(self):
         """ Parse Arguments.
         """
-        self.opt = self.parser.parse_args()
+        self.opt, _ = self.parser.parse_known_args()
         self.opt.isTrain = self.isTrain   # train or test
 
         str_ids = self.opt.gpu_ids.split(',')
