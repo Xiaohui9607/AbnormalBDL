@@ -200,8 +200,8 @@ class ANB:
             net_G.train()
         for epoch in range(self.opt.niter):
             self.train_epoch(epoch)
+            self.save_weight(epoch)
             self.test_epoch(epoch)
-            # self.save_weight(epoch)
 
     def save_weight(self, epoch):
         for _idx, net_G in enumerate(self.net_Gs):
@@ -236,24 +236,24 @@ class ANB:
                         lat = torch.mean(torch.pow(lat, 2), dim=1)
 
                         means[_idxData * self.opt.batchsize:(_idxData+1)*self.opt.batchsize, _idxG, _idxD].copy_(lat)
-
-            vars_D_based = torch.var(means, dim=1, keepdim=True)
-            vars_G_based = torch.var(means, dim=2, keepdim=True)
+            
+            #vars_D_based = torch.var(means, dim=1, keepdim=True)
+            #vars_G_based = torch.var(means, dim=2, keepdim=True)
 
             means_D_based = torch.mean(means, dim=1, keepdim=True)
-            means_G_based = torch.mean(means, dim=2, keepdim=True)
+            #means_G_based = torch.mean(means, dim=2, keepdim=True)
 
-            vars_D_based = torch.mean(vars_D_based+torch.pow(means_D_based, 2), dim=2)
-            vars_G_based = torch.mean(vars_G_based+torch.pow(means_G_based, 2), dim=1)
+            #vars_D_based = torch.mean(vars_D_based+torch.pow(means_D_based, 2), dim=2)
+            #vars_G_based = torch.mean(vars_G_based+torch.pow(means_G_based, 2), dim=1)
 
             means = torch.mean(means_D_based, dim=2)
 
-            if self.opt.std_policy == 'D_based':
-                vars = vars_D_based - torch.pow(means, 2)
-            elif self.opt.std_policy == "G_based":
-                vars = vars_G_based - torch.pow(means, 2)
-            else:
-                vars = torch.mean(torch.cat([vars_G_based, vars_D_based], dim=1)) - torch.pow(means, 2)
+            #if self.opt.std_policy == 'D_based':
+            #    vars = vars_D_based - torch.pow(means, 2)
+            #elif self.opt.std_policy == "G_based":
+            #    vars = vars_G_based - torch.pow(means, 2)
+            #else:
+            #    vars = torch.mean(torch.cat([vars_G_based, vars_D_based], dim=1)) - torch.pow(means, 2)
 
 
             # vars = [torch.var(mean, dim=1, keepdim=True) for mean in means]
@@ -263,19 +263,19 @@ class ANB:
             # vars = vars - torch.pow(means, 2)
 
             means = means.cpu().squeeze()
-            vars = vars.cpu().squeeze()
+            #vars = vars.cpu().squeeze()
 
             per_scores = means
             per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
             auc_means = roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
                                                                             "test/plots/mean_at_epoch{0}.png".format(epoch)))
-            per_scores = torch.sqrt(vars)
-            per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
-            auc_std = roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
-                                                                                  "test/plots/mean_at_epoch{0}.png".format(
-                                                                                      epoch)))
+            #per_scores = torch.sqrt(vars)
+            #per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
+            #auc_std = roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
+            #                                                                      "test/plots/var_at_epoch{0}.png".format(
+            #                                                                          epoch)))
             self.rocs['mean_metric'].append(auc_means)
-            self.rocs['std_metric'].append(auc_std)
+            #self.rocs['std_metric'].append(auc_std)
 
             # PLOT HISTOGRAM
             if plot_hist:

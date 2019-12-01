@@ -19,17 +19,17 @@ class Options():
 
         ##
         # Base
-        self.parser.add_argument('--dataset', default='mnist', help='folder | cifar10 | mnist | OCT')
+        self.parser.add_argument('--dataset', default='OCT', help='folder | cifar10 | mnist | OCT')
         self.parser.add_argument('--dataroot', default='', help='path to dataset')        
         self.parser.add_argument('--path', default='', help='path to the folder or image to be predicted.')
 
-        self.parser.add_argument('--batchsize', type=int, default=640, help='input batch size')
+        self.parser.add_argument('--batchsize', type=int, default=16, help='input batch size')
         self.parser.add_argument('--split', type=int, default=1, help='number of forward pass before backprop')
         self.parser.add_argument('--workers', type=int, help='number of data loading workers', default=8)
         self.parser.add_argument('--droplast', action='store_true', default=True, help='Drop last batch size.')
-        self.parser.add_argument('--isize', type=int, default=32, help='input image size.')
+        self.parser.add_argument('--isize', type=int, default=256, help='input image size.')
         self.parser.add_argument('--nc', type=int, default=1, help='input image channels')
-        self.parser.add_argument('--nz', type=int, default=16, help='size of the latent z vector')
+        self.parser.add_argument('--nz', type=int, default=128, help='size of the latent z vector')
         self.parser.add_argument('--ngf', type=int, default=64)
         self.parser.add_argument('--ndf', type=int, default=64)
         self.parser.add_argument('--extralayers', type=int, default=0, help='Number of extra layers on gen and disc')
@@ -48,8 +48,8 @@ class Options():
         self.parser.add_argument('--abnormal_class', default='0', help='Anomaly class idx for mnist and cifar datasets')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric: roc | auprc')
         self.parser.add_argument('--bayes', action='store_true', default=False, help='Drop last batch size.')
-        self.parser.add_argument('--n_MC_Gen', type=int, default=3, help='number of Generator parameters')
-        self.parser.add_argument('--n_MC_Disc', type=int, default=3, help='number of Discriminator parameters')
+        self.parser.add_argument('--n_MC_Gen', type=int, default=1, help='number of Generator parameters')
+        self.parser.add_argument('--n_MC_Disc', type=int, default=1, help='number of Discriminator parameters')
         # self.parser.add_argument('--noise_alpha', type=float, default=0.01, help='SGHMC friction and noise')
         # self.parser.add_argument('--warm_up', type=int, default=2000, help='number of iteration that use Adam optimizer')
         self.parser.add_argument('--save_weight', action='store_true', default=False, help='Save weight in each iteration')
