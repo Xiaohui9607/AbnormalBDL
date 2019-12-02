@@ -54,7 +54,6 @@ def load_data(opt):
                                         transforms.ToTensor(),
                                         transforms.Normalize((0.1307,), (0.3081,))])
 
-
         train_ds = MNIST(root='./data', train=True, download=True, transform=transform)
         valid_ds = MNIST(root='./data', train=False, download=True, transform=transform)
         train_ds, valid_ds = get_mnist_anomaly_dataset(train_ds, valid_ds, int(opt.abnormal_class))

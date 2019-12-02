@@ -12,7 +12,7 @@ from collections import OrderedDict
 from utils import weights_init, Visualizer
 from dataloader.dataloader import load_data
 from torch.optim.lr_scheduler import StepLR
-from models.networks import Generator, Discriminator, get_scheduler
+from models.networks import Generator, Discriminator, define_D, define_G
 from utils.loss import lat_loss, con_loss
 
 torch.autograd.set_detect_anomaly(True)
@@ -37,7 +37,12 @@ class ANB:
             'mean_metric':[],
             'std_metric':[]
         }
-
+        if self.opt.DCGAN:
+            self.create_D = define_D
+            self.create_G = define_G
+        else:
+            self.create_D = Discriminator
+            self.create_G = Generator
         if self.opt.phase == 'train':
             # TODO: initialize network and optimizer
             self.generator_setup()
@@ -50,14 +55,12 @@ class ANB:
             self.l_adv = nn.BCELoss(reduction='mean')
             self.l_con = con_loss(b=self.opt.scale_con, reduction='mean')
             self.l_lat = lat_loss(sigma=self.opt.sigma_lat, reduction='mean')
-            self.schedulers = [get_scheduler(optimizer, opt) for optimizer in self.optimizer_Gs] + \
-                              [get_scheduler(optimizer, opt) for optimizer in self.optimizer_Ds]
 
     def generator_setup(self):
         self.net_Gs = []
         self.optimizer_Gs = []
 
-        net_G = Generator(self.opt).to(self.device)
+        net_G = self.create_G(self.opt).to(self.device)
         optimizer_G = torch.optim.Adam(net_G.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
 
         self.net_Gs.append(net_G)
@@ -66,7 +69,7 @@ class ANB:
         # if self.opt.bayes:
         self.net_Gs[0].apply(weights_init)
         for _idxmc in range(1, self.opt.n_MC_Gen):
-            net_G = Generator(self.opt).to(self.device)
+            net_G = self.create_G(self.opt).to(self.device)
             # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
             net_G.apply(weights_init)
             optimizer_G = torch.optim.Adam(net_G.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
@@ -77,7 +80,7 @@ class ANB:
         self.net_Ds = []
         self.optimizer_Ds = []
 
-        net_D = Discriminator(self.opt).to(self.device)
+        net_D = self.create_D(self.opt).to(self.device)
         optimizer_D = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))
 
         self.net_Ds.append(net_D)
@@ -85,7 +88,7 @@ class ANB:
 
         self.net_Ds[0].apply(weights_init)
         for _idxmc in range(1, self.opt.n_MC_Disc):
-            net_D = Discriminator(self.opt).to(self.device)
+            net_D = self.create_D(self.opt).to(self.device)
             # TODO: initialized weight with prior N(0, 0.02) [From bayesian GAN]
             net_D.apply(weights_init)
             optimizer_D = torch.optim.Adam(net_D.parameters(), lr=self.opt.lr, betas=(self.opt.beta1, 0.999))

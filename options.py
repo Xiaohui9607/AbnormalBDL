@@ -53,6 +53,7 @@ class Options():
         # self.parser.add_argument('--noise_alpha', type=float, default=0.01, help='SGHMC friction and noise')
         # self.parser.add_argument('--warm_up', type=int, default=2000, help='number of iteration that use Adam optimizer')
         self.parser.add_argument('--save_weight', action='store_true', default=False, help='Save weight in each iteration')
+        self.parser.add_argument('--DCGAN', action='store_true', default=True, help='DCGAN | UNET')
         ##
         # Train
         self.parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
