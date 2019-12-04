@@ -68,6 +68,7 @@ def load_data(opt):
         transform = transforms.Compose([
                                         transforms.Grayscale(),
                                         transforms.Resize(opt.isize),
+                                        transforms.CenterCrop(opt.isize),
                                         transforms.ToTensor()])
 
         transform_train = transforms.Compose([

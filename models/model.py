@@ -204,8 +204,8 @@ class ANB:
         for epoch in range(self.opt.niter):
             self.train_epoch(epoch)
             self.save_weight(epoch)
-            self.test_oct(epoch)
-            # self.test_epoch(epoch)
+            # self.test_oct(epoch)
+            self.test_epoch(epoch)
 
     def save_weight(self, epoch):
         for _idx, net_G in enumerate(self.net_Gs):
