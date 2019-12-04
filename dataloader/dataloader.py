@@ -6,11 +6,14 @@ LOAD DATA from file.
 
 ##
 import os
+import torch
 from torchvision import transforms
+from torchvision.transforms import functional as F
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST, CIFAR10, ImageFolder
 from dataloader.datasets import get_cifar_anomaly_dataset
 from dataloader.datasets import get_mnist_anomaly_dataset
+
 
 class Data:
     """ Dataloader containing train and valid sets.
@@ -62,10 +65,23 @@ def load_data(opt):
 
     elif opt.dataset in ['OCT']:
         # TODO: fix the OCT dataset into the dataloader and return
-        transform = transforms.Compose([transforms.Grayscale(),
+        transform = transforms.Compose([
+                                        transforms.Grayscale(),
                                         transforms.Resize(opt.isize),
-                                        transforms.CenterCrop(opt.isize),
-                                        transforms.ToTensor(),])
+                                        transforms.ToTensor()])
+
+        transform_train = transforms.Compose([
+                                        transforms.Grayscale(),
+                                        transforms.Resize(opt.isize*2),
+                                        transforms.RandomCrop(opt.isize),
+                                        transforms.ToTensor()])
+
+        transform_test = transforms.Compose([
+                                        transforms.Grayscale(),
+                                        transforms.Resize(opt.isize*2),
+                                        transforms.FiveCrop(opt.isize),
+                                        transforms.Lambda(lambda xs: torch.cat([F.to_tensor(x) for x in xs]))
+                                        ])
 
         train_ds = ImageFolder(os.path.join(opt.dataroot, 'train'), transform)
         valid_ds = ImageFolder(os.path.join(opt.dataroot, 'test'), transform)

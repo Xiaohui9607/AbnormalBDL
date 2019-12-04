@@ -23,7 +23,7 @@ class Options():
         self.parser.add_argument('--dataroot', default='', help='path to dataset')        
         self.parser.add_argument('--path', default='', help='path to the folder or image to be predicted.')
 
-        self.parser.add_argument('--batchsize', type=int, default=16, help='input batch size')
+        self.parser.add_argument('--batchsize', type=int, default=8, help='input batch size')
         self.parser.add_argument('--split', type=int, default=1, help='number of forward pass before backprop')
         self.parser.add_argument('--workers', type=int, help='number of data loading workers', default=8)
         self.parser.add_argument('--droplast', action='store_true', default=True, help='Drop last batch size.')
@@ -34,7 +34,7 @@ class Options():
         self.parser.add_argument('--ndf', type=int, default=64)
         self.parser.add_argument('--extralayers', type=int, default=0, help='Number of extra layers on gen and disc')
         self.parser.add_argument('--device', type=str, default='gpu', help='Device: gpu | cpu')
-        self.parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        self.parser.add_argument('--gpu_ids', type=str, default='-1', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self.parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
         self.parser.add_argument('--name', type=str, default='dp2', help='name of the experiment')
         self.parser.add_argument('--model', type=str, default='abnomalGAN', help='chooses which model to use. ganomaly')
@@ -53,7 +53,7 @@ class Options():
         # self.parser.add_argument('--noise_alpha', type=float, default=0.01, help='SGHMC friction and noise')
         # self.parser.add_argument('--warm_up', type=int, default=2000, help='number of iteration that use Adam optimizer')
         self.parser.add_argument('--save_weight', action='store_true', default=False, help='Save weight in each iteration')
-        self.parser.add_argument('--DCGAN', action='store_true', default=True, help='DCGAN | UNET')
+        self.parser.add_argument('--DCGAN', action='store_true', help='DCGAN | UNET')
         ##
         # Train
         self.parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')
