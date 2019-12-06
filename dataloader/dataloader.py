@@ -65,11 +65,19 @@ def load_data(opt):
 
     elif opt.dataset in ['OCT']:
         # TODO: fix the OCT dataset into the dataloader and return
+        def white_noise(x):
+            x = x + torch.randn(x.shape)*0.01
+            x[x > 1] = 1
+            x[x < 0] = 0
+            return x
         transform = transforms.Compose([
                                         transforms.Grayscale(),
                                         transforms.Resize(opt.isize),
+                                        transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
                                         transforms.CenterCrop(opt.isize),
-                                        transforms.ToTensor()])
+                                        transforms.RandomHorizontalFlip(),
+                                        transforms.ToTensor(),
+                                        transforms.Lambda(white_noise)])
 
         transform_train = transforms.Compose([
                                         transforms.Grayscale(),
@@ -95,3 +103,4 @@ def load_data(opt):
     valid_dl = DataLoader(dataset=valid_ds, batch_size=opt.batchsize, shuffle=False, drop_last=False)
 
     return Data(train_dl, valid_dl)
+
