@@ -70,30 +70,25 @@ def load_data(opt):
             x[x > 1] = 1
             x[x < 0] = 0
             return x
-        transform = transforms.Compose([
-                                        transforms.Grayscale(),
-                                        transforms.Resize(opt.isize),
-                                        transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
-                                        transforms.CenterCrop(opt.isize),
-                                        transforms.RandomHorizontalFlip(),
-                                        transforms.ToTensor(),
-                                        transforms.Lambda(white_noise)])
 
         transform_train = transforms.Compose([
-                                        transforms.Grayscale(),
-                                        transforms.Resize(opt.isize*2),
-                                        transforms.RandomCrop(opt.isize),
-                                        transforms.ToTensor()])
+            transforms.Grayscale(),
+            transforms.Resize(opt.isize),
+            transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
+            transforms.CenterCrop(opt.isize),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Lambda(white_noise)])
+
 
         transform_test = transforms.Compose([
-                                        transforms.Grayscale(),
-                                        transforms.Resize(opt.isize*2),
-                                        transforms.FiveCrop(opt.isize),
-                                        transforms.Lambda(lambda xs: torch.cat([F.to_tensor(x) for x in xs]))
-                                        ])
+            transforms.Grayscale(),
+            transforms.Resize(opt.isize),
+            transforms.CenterCrop(opt.isize),
+            transforms.ToTensor(),])
 
-        train_ds = ImageFolder(os.path.join(opt.dataroot, 'train'), transform)
-        valid_ds = ImageFolder(os.path.join(opt.dataroot, 'test'), transform)
+        train_ds = ImageFolder(os.path.join(opt.dataroot, 'train'), transform_train)
+        valid_ds = ImageFolder(os.path.join(opt.dataroot, 'test'), transform_test)
 
     else:
         raise NotImplementedError
