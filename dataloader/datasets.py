@@ -207,7 +207,6 @@ def get_mnist_anomaly_dataset(train_ds, valid_ds, abn_cls_idx=0):
     Returns:
         [np.array] -- New training-test images and labels.
     """
-
     # Get images and labels.
     trn_img, trn_lbl = train_ds.data, train_ds.targets
     tst_img, tst_lbl = valid_ds.data, valid_ds.targets
