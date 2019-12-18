@@ -1,17 +1,13 @@
 import os
-import math
 import torch
 import pandas as pd
 from torch import nn
 from tqdm import tqdm
-import seaborn as sns
-import random
 import matplotlib.pyplot as plt
 from models.evaluate import roc
 from collections import OrderedDict
-from utils import weights_init, Visualizer
+from utils import Visualizer
 from dataloader.dataloader import load_data
-from torch.optim.lr_scheduler import StepLR
 from models.networks import Generator, Discriminator, define_D, define_G
 from utils.loss import lat_loss, con_loss
 
