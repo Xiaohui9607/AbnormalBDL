@@ -1,3 +1,0 @@
-================ Tue Nov 19 14:38:09 2019 ================
-abnormal class: 0, n_z: 128, w_adv: 1, scale_con: 0.02, sigma_lat: 1
-
