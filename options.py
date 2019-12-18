@@ -95,24 +95,6 @@ class Options():
                 print('%s: %s' % (str(k), str(v)))
             print('-------------- End ----------------')
 
-        # if self.opt.name == 'experiment_name':
-        #     self.opt.name = "%s/%s" % (self.opt.model, self.opt.dataset)
-        # expr_dir = os.path.join(self.opt.outf, self.opt.name, 'train')
-        # test_dir = os.path.join(self.opt.outf, self.opt.name, 'test')
-        #
-        # if not os.path.isdir(expr_dir):
-        #     os.makedirs(expr_dir)
-        #     os.makedirs("{0}/weights".format(expr_dir))
-        # if not os.path.isdir(test_dir):
-        #     os.makedirs(test_dir)
-        #     os.makedirs("{0}/plots".format(test_dir))
-        #
-        # file_name = os.path.join(expr_dir, 'opt.txt')
-        # with open(file_name, 'wt') as opt_file:
-        #     opt_file.write('------------ Options -------------\n')
-        #     for k, v in sorted(args.items()):
-        #         opt_file.write('%s: %s\n' % (str(k), str(v)))
-        #     opt_file.write('-------------- End ----------------\n')
         return self.opt
 
 def setup_dir(opt):
@@ -136,6 +118,3 @@ def setup_dir(opt):
         opt_file.write('-------------- End ----------------\n')
     return opt
 
-# if __name__ == '__main__':
-#     opt = Options().parse()
-#     setup_dir(opt)
