@@ -46,12 +46,8 @@ class Options():
         self.parser.add_argument('--outf', default='./output', help='folder to output images and model checkpoints')
         self.parser.add_argument('--manualseed', default=-1, type=int, help='manual seed')
         self.parser.add_argument('--abnormal_class', default='0', help='Anomaly class idx for mnist and cifar datasets')
-        self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric: roc | auprc')
-        self.parser.add_argument('--bayes', action='store_true', default=False, help='Drop last batch size.')
         self.parser.add_argument('--n_MC_Gen', type=int, default=3, help='number of Generator parameters')
         self.parser.add_argument('--n_MC_Disc', type=int, default=3, help='number of Discriminator parameters')
-        # self.parser.add_argument('--noise_alpha', type=float, default=0.01, help='SGHMC friction and noise')
-        # self.parser.add_argument('--warm_up', type=int, default=2000, help='number of iteration that use Adam optimizer')
         self.parser.add_argument('--save_weight', action='store_true', default=False, help='Save weight in each iteration')
         self.parser.add_argument('--DCGAN', action='store_true', help='DCGAN | UNET')
         ##
@@ -64,17 +60,12 @@ class Options():
         self.parser.add_argument('--phase', type=str, default='train', help='train, val, test, etc')
         self.parser.add_argument('--iter', type=int, default=0, help='Start from iteration i')
         self.parser.add_argument('--niter', type=int, default=15, help='number of epochs to train for')
-        self.parser.add_argument('--niter_decay', type=int, default=100, help='# of iter to linearly decay learning rate to zero')
         self.parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
         self.parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate for adam')
 
         self.parser.add_argument('--sigma_lat', type=float, default=1, help='Weight for latent space loss. default=1')
         self.parser.add_argument('--scale_con', type=float, default=0.02, help='Weight for reconstruction loss. default=0.02')
         self.parser.add_argument('--w_adv', type=float, default=1, help='Weight for adversarial loss. default=1')
-        # self.parser.add_argument('--w_con', type=float, default=50, help='Weight for reconstruction loss. default=50')
-        # self.parser.add_argument('--w_lat', type=float, default=1, help='Weight for latent space loss. default=1')
-        self.parser.add_argument('--lr_policy', type=str, default='lambda', help='lambda|step|plateau')
-        self.parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters iterations')
         self.parser.add_argument('--std_policy', type=str, default='D_based', help='D_based|G_based|DG_based')
         self.isTrain = True
         self.opt = None
