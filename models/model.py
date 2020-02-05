@@ -10,6 +10,7 @@ from utils import Visualizer
 from dataloader.dataloader import load_data
 from models.networks import Generator, Discriminator, define_D, define_G
 from utils.loss import lat_loss, con_loss
+from utils import weights_init
 
 torch.autograd.set_detect_anomaly(True)
 

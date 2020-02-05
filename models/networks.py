@@ -65,7 +65,7 @@ class Encoder(nn.Module):
                             nn.Conv2d(in_feat, out_feat, 4, 2, 1, bias=False))
             main.add_module('pyramid-{0}-batchnorm'.format(out_feat),
                             nn.BatchNorm2d(out_feat, affine=affine))
-            main.add_module('pyramid-{0}-relu'.format(out_feat),
+            main.add_module('pyramid-{0}-relu'.format(out_fxeat),
                             nn.LeakyReLU(0.2, inplace=False))
             cndf = cndf * 2
             csize = csize / 2
