@@ -22,7 +22,6 @@ class ANB:
         self.opt.batchsize //= self.opt.split
         self.dataloader = {
             "gen": [load_data(self.opt) for _ in range(self.opt.n_MC_Gen)],
-            "disc": [load_data(self.opt) for _ in range(self.opt.n_MC_Disc)]
         }
 
         self.epoch = self.opt.niter
@@ -53,6 +52,8 @@ class ANB:
             self.l_con = con_loss(b=self.opt.scale_con, reduction='mean')
             self.l_lat = lat_loss(sigma=self.opt.sigma_lat, reduction='mean')
 
+
+
     def generator_setup(self):
         self.net_Gs = []
         self.optimizer_Gs = []
@@ -63,7 +64,6 @@ class ANB:
         self.net_Gs.append(net_G)
         self.optimizer_Gs.append(optimizer_G)
 
-        # if self.opt.bayes:
         self.net_Gs[0].apply(weights_init)
         for _idxmc in range(1, self.opt.n_MC_Gen):
             net_G = self.create_G(self.opt).to(self.device)
@@ -101,94 +101,82 @@ class ANB:
                 ('err_g_con', []),
                 ('err_d_lat', [])])
 
-            for _idxD in range(self.opt.n_MC_Disc):
-                x_real, _ = next(iter(self.dataloader["disc"][_idxD].train))
+            err_d_fakes = []
+            err_d_lats = []
+            err_d_reals = []
+            err_g_fakes = []
+            err_g_cons = []
+            display_image = None
+            for _idx in range(self.opt.n_MC_Disc):
+
+                x_real, _ = next(iter(self.dataloader["gen"][_idx].train))
+                if _idx == 0:
+                    display_image = x_real
                 x_real = x_real.to(self.device)
-                # TODO update each disc with all gens
-                self.net_Ds[_idxD].zero_grad()
+                # TODO: optimize net_D
+                self.net_Ds[_idx].zero_grad()
                 label_real = torch.ones(x_real.shape[0]).to(self.device)
-                pred_real, feat_real = self.net_Ds[_idxD](x_real)
+                pred_real, feat_real = self.net_Ds[_idx](x_real)
+
+                x_fake = self.net_Gs[_idx](x_real)
+                pred_fake, feat_fake = self.net_Ds[_idx](x_fake.detach())
+                label_fake = torch.zeros(x_real.shape[0]).to(self.device)
+
+                # TODO: net_D loss
+                err_d_fake = self.l_adv(pred_fake, label_fake)
+                err_d_fakes.append(err_d_fake)
+
+                err_d_lat = self.l_lat(feat_real, feat_fake)
+                err_d_lats.append(err_d_lat)
+
                 err_d_real = self.l_adv(pred_real, label_real)
+                err_d_reals.append(err_d_real)
 
-                err_d_fakes = []
-                err_d_lats = []
+                # TODO: optimize net_G
+                self.net_Gs[_idx].zero_grad()
+                _, feat_real = self.net_Ds[_idx](x_real)
+                x_fake = self.net_Gs[_idx](x_real)
+                pred_fake, _ = self.net_Ds[_idx](x_fake)
+                label_real = torch.ones(x_real.shape[0]).to(self.device)
 
-                for _idxG in range(self.opt.n_MC_Gen):
-                    # self.net_Gs[_idxG].zero_grad()
-                    x_fake = self.net_Gs[_idxG](x_real)
-                    pred_fake, feat_fake = self.net_Ds[_idxD](x_fake.detach())
-                    label_fake = torch.zeros(x_real.shape[0]).to(self.device)
-                    err_d_fake = self.l_adv(pred_fake, label_fake)
-                    err_d_fakes.append(err_d_fake)
-
-                    err_d_lat = self.l_lat(feat_real, feat_fake)
-                    err_d_lats.append(err_d_lat)
-
-                err_d_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
-                err_d_lat_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
-                for err_d_fake, err_d_lat in zip(err_d_fakes, err_d_lats):
-
-                    err_d_loss = err_d_fake + err_d_real + err_d_lat
-                    err_d_total_loss += err_d_loss
-                    err_d_lat_loss += err_d_lat
-
-                err_d_total_loss /= self.opt.n_MC_Gen
-
-                err_d_total_loss.backward()
-                self.optims['disc'][_idxD].step()
-
-                errors['err_d'].append(err_d_total_loss.detach() - err_d_lat_loss.detach()/self.opt.n_MC_Gen)
-                errors['err_d_lat'].append(err_d_lat_loss.detach())
-
-            # TODO update each gen with all discs
-            for _idxG in range(self.opt.n_MC_Gen):
-                x_real, _ = next(iter(self.dataloader["gen"][_idxG].train))
-                x_real = x_real.to(self.device)
-
-                self.net_Gs[_idxG].zero_grad()
-
-                x_fake = self.net_Gs[_idxG](x_real)
+                # TODO: net_G loss
                 err_g_con = self.l_con(x_real, x_fake)
+                err_g_fake = self.l_adv(pred_fake, label_real)
+                err_g_fakes.append(err_g_fake)
+                err_g_cons.append(err_g_con)
 
-                err_g_fakes = []
+            err_d_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
+            err_g_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
 
-                for _idxD in range(self.opt.n_MC_Disc):
-                    _, feat_real = self.net_Ds[_idxD](x_real)
-                    x_fake = self.net_Gs[_idxG](x_real)
-                    pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
-                    label_real = torch.ones(x_real.shape[0]).to(self.device)
+            for _err_g_fake, _err_g_con in zip(err_g_fakes, err_g_cons):
+                err_g_total_loss += _err_g_fake + _err_g_con
 
-                    err_g_fake = self.l_adv(pred_fake, label_real)
-                    err_g_fakes.append(err_g_fake)
+            for _err_d_fake, _err_d_real, _err_d_lat in zip(err_d_fakes, err_d_reals, err_d_lats):
+                err_d_loss = _err_d_fake + _err_d_real + _err_d_lat
+                err_d_total_loss += err_d_loss
 
-                err_g_total_loss = torch.zeros([1, ], dtype=torch.float32).to(self.device)
+            err_g_total_loss /= self.opt.n_MC_Disc
+            err_d_total_loss /= self.opt.n_MC_Disc
+            err_g_total_loss.backward()
+            err_d_total_loss.backward()
+            for _idx in range(self.opt.n_MC_Disc):
+                self.optims['gen'][_idx].step()
+                self.optims['disc'][_idx].step()
 
-                for err_g_fake in err_g_fakes:
-                    err_g_total_loss += err_g_fake
-
-                err_g_total_loss /= self.opt.n_MC_Disc
-                err_g_total_loss += err_g_con
-
-                err_g_total_loss.backward()
-                self.optims['gen'][_idxG].step()
-
-                errors['err_g'].append(err_g_total_loss.detach())
-                errors['err_g_con'].append(err_g_con.detach().reshape([1]))
-
+            errors['err_g'].append(err_g_total_loss.detach())
             epoch_iter = _iter * self.opt.batchsize
+            errors['err_d'].append(err_d_total_loss.detach())
 
             # ploting
             if epoch_iter % self.opt.print_freq == 0:
                 errors['err_g'] = torch.mean(torch.cat(errors['err_g'])).item()
-                errors['err_g_con'] = torch.mean(torch.cat(errors['err_g_con'])).item()
                 errors['err_d'] = torch.mean(torch.cat(errors['err_d'])).cpu().item()
-                errors['err_d_lat'] = torch.mean(torch.cat(errors['err_d_lat'])).cpu().item()
                 if self.opt.display:
                     counter_ratio = float(epoch_iter) / len(self.dataloader["gen"][0].train.dataset)
                     self.visualizer.plot_current_errors(epoch, counter_ratio, errors)
 
             if epoch_iter % self.opt.save_image_freq == 0:
-                reals, fakes = x_real, torch.cat([net_G(x_real).detach() for net_G in self.net_Gs], dim=0)
+                reals, fakes = display_image, torch.cat([net_G(display_image).detach() for net_G in self.net_Gs], dim=0)
                 self.visualizer.save_current_images(epoch, reals, fakes)
                 if self.opt.display:
                     self.visualizer.display_current_images(reals, fakes)
@@ -214,7 +202,7 @@ class ANB:
     def test_epoch(self, epoch, plot_hist=True):
         with torch.no_grad():
             self.opt.phase = 'test'
-            means = torch.empty(size=(len(self.dataloader["gen"][0].valid.dataset), self.opt.n_MC_Gen, self.opt.n_MC_Disc), dtype=torch.float32,
+            means = torch.empty(size=(len(self.dataloader["gen"][0].valid.dataset), self.opt.n_MC_Gen), dtype=torch.float32,
                                 device=self.device)
 
             gt_labels = torch.zeros(size=(len(self.dataloader["gen"][0].valid.dataset),),
@@ -222,41 +210,41 @@ class ANB:
 
             for _idxData, (x_real, label) in enumerate(self.dataloader["gen"][0].valid, 0):
                 x_real = x_real.to(self.device)
-
                 gt_labels[_idxData * self.opt.batchsize: _idxData * self.opt.batchsize + label.size(0)] = label
                 for _idxD in range(self.opt.n_MC_Disc):
                     pred_real, feat_real = self.net_Ds[_idxD](x_real)
-                    for _idxG in range(self.opt.n_MC_Gen):
-                        x_fake = self.net_Gs[_idxG](x_real)
-                        pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
+                    # for _idxG in range(self.opt.n_MC_Gen):
+                    x_fake = self.net_Gs[_idxD](x_real)
+                    pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
 
-                        sz = feat_real.size()
+                    sz = feat_real.size()
 
-                        lat = (feat_real - feat_fake).view(sz[0], sz[1] * sz[2] * sz[3])
+                    lat = (feat_real - feat_fake).view(sz[0], sz[1] * sz[2] * sz[3])
 
-                        lat = torch.mean(torch.pow(lat, 2), dim=1)
+                    lat = torch.mean(torch.pow(lat, 2), dim=1)
 
-                        means[_idxData * self.opt.batchsize:(_idxData+1)*self.opt.batchsize, _idxG, _idxD].copy_(lat)
+                    means[_idxData * self.opt.batchsize:(_idxData+1)*self.opt.batchsize, _idxD].copy_(lat)
 
+            vars = torch.var(means, dim=1, keepdim=True)
+            means = torch.mean(means, dim=1, keepdim=True)
+            # vars_D_based = torch.var(means, dim=1, keepdim=True)
+            # vars_G_based = torch.var(means, dim=2, keepdim=True)
+            #
+            # means_D_based = torch.mean(means, dim=1, keepdim=True)
+            # means_G_based = torch.mean(means, dim=2, keepdim=True)
+            #
+            # vars_D_based = torch.mean(vars_D_based+torch.pow(means_D_based, 2), dim=2)
+            # vars_G_based = torch.mean(vars_G_based+torch.pow(means_G_based, 2), dim=1)
+            #
+            # means = torch.mean(means_D_based, dim=2)
 
-            vars_D_based = torch.var(means, dim=1, keepdim=True)
-            vars_G_based = torch.var(means, dim=2, keepdim=True)
-
-            means_D_based = torch.mean(means, dim=1, keepdim=True)
-            means_G_based = torch.mean(means, dim=2, keepdim=True)
-
-            vars_D_based = torch.mean(vars_D_based+torch.pow(means_D_based, 2), dim=2)
-            vars_G_based = torch.mean(vars_G_based+torch.pow(means_G_based, 2), dim=1)
-
-            means = torch.mean(means_D_based, dim=2)
-
-            if self.opt.std_policy == 'D_based':
-               vars = vars_D_based - torch.pow(means, 2)
-            elif self.opt.std_policy == "G_based":
-               vars = vars_G_based - torch.pow(means, 2)
-            else:
-               vars = torch.mean(torch.cat([vars_G_based, vars_D_based], dim=1)) - torch.pow(means, 2)
-
+            # if self.opt.std_policy == 'D_based':
+            #    vars = vars_D_based - torch.pow(means, 2)
+            # elif self.opt.std_policy == "G_based":
+            #    vars = vars_G_based - torch.pow(means, 2)
+            # else:
+            #    vars = torch.mean(torch.cat([vars_G_based, vars_D_based], dim=1)) - torch.pow(means, 2)
+            #
             means = means.cpu().squeeze()
             vars = vars.cpu().squeeze()
 
