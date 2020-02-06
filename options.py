@@ -41,7 +41,7 @@ class Options():
         self.parser.add_argument('--display_server', type=str, default="http://localhost", help='visdom server of the web display')
         self.parser.add_argument('--display_port', type=int, default=8097, help='visdom port of the web display')
         self.parser.add_argument('--display_id', type=int, default=0, help='window id of the web display')
-        self.parser.add_argument('--display', default=True, action='store_true', help='Use visdom.')
+        self.parser.add_argument('--display', default=False, action='store_true', help='Use visdom.')
         self.parser.add_argument('--verbose', action='store_true', help='Print the training and model details.')
         self.parser.add_argument('--outf', default='./output', help='folder to output images and model checkpoints')
         self.parser.add_argument('--manualseed', default=-1, type=int, help='manual seed')
