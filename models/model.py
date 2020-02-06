@@ -110,9 +110,9 @@ class ANB:
             for _idx in range(self.opt.n_MC_Disc):
 
                 x_real, _ = next(iter(self.dataloader["gen"][_idx].train))
+                x_real = x_real.to(self.device)
                 if _idx == 0:
                     display_image = x_real
-                x_real = x_real.to(self.device)
                 # TODO: optimize net_D
                 self.net_Ds[_idx].zero_grad()
                 label_real = torch.ones(x_real.shape[0]).to(self.device)
