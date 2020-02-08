@@ -108,7 +108,6 @@ class ANB:
             err_g_cons = []
             display_image = None
             for _idx in range(self.opt.n_MC_Disc):
-
                 x_real, _ = next(iter(self.dataloader["gen"][_idx].train))
                 x_real = x_real.to(self.device)
                 if _idx == 0:
@@ -227,24 +226,6 @@ class ANB:
 
             vars = torch.var(means, dim=1, keepdim=True)
             means = torch.mean(means, dim=1, keepdim=True)
-            # vars_D_based = torch.var(means, dim=1, keepdim=True)
-            # vars_G_based = torch.var(means, dim=2, keepdim=True)
-            #
-            # means_D_based = torch.mean(means, dim=1, keepdim=True)
-            # means_G_based = torch.mean(means, dim=2, keepdim=True)
-            #
-            # vars_D_based = torch.mean(vars_D_based+torch.pow(means_D_based, 2), dim=2)
-            # vars_G_based = torch.mean(vars_G_based+torch.pow(means_G_based, 2), dim=1)
-            #
-            # means = torch.mean(means_D_based, dim=2)
-
-            # if self.opt.std_policy == 'D_based':
-            #    vars = vars_D_based - torch.pow(means, 2)
-            # elif self.opt.std_policy == "G_based":
-            #    vars = vars_G_based - torch.pow(means, 2)
-            # else:
-            #    vars = torch.mean(torch.cat([vars_G_based, vars_D_based], dim=1)) - torch.pow(means, 2)
-            #
             means = means.cpu().squeeze()
             vars = vars.cpu().squeeze()
 
