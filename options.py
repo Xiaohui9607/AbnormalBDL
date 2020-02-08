@@ -49,7 +49,7 @@ class Options():
         self.parser.add_argument('--n_MC_Gen', type=int, default=3, help='number of Generator parameters')
         self.parser.add_argument('--n_MC_Disc', type=int, default=3, help='number of Discriminator parameters')
         self.parser.add_argument('--save_weight', action='store_true', default=False, help='Save weight in each iteration')
-        self.parser.add_argument('--DCGAN', action='store_true', help='DCGAN | UNET')
+        self.parser.add_argument('--UNET', action='store_true', help='DCGAN | UNET')
         ##
         # Train
         self.parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')

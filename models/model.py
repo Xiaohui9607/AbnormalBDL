@@ -33,7 +33,7 @@ class ANB:
             'mean_metric':[],
             'std_metric':[]
         }
-        if self.opt.DCGAN:
+        if self.opt.UNET:
             self.create_D = define_D
             self.create_G = define_G
         else:
@@ -212,7 +212,6 @@ class ANB:
                 gt_labels[_idxData * self.opt.batchsize: _idxData * self.opt.batchsize + label.size(0)] = label
                 for _idxD in range(self.opt.n_MC_Disc):
                     pred_real, feat_real = self.net_Ds[_idxD](x_real)
-                    # for _idxG in range(self.opt.n_MC_Gen):
                     x_fake = self.net_Gs[_idxD](x_real)
                     pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
 
