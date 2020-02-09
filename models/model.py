@@ -37,12 +37,8 @@ class ANB:
             'mean_metric':[],
             'std_metric':[]
         }
-        if self.opt.DCGAN:
-            self.create_D = define_D
-            self.create_G = define_G
-        else:
-            self.create_D = Discriminator
-            self.create_G = Generator
+        self.create_D = Discriminator
+        self.create_G = Generator
         if self.opt.phase == 'train':
             # TODO: initialize network and optimizer
             self.generator_setup()
