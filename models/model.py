@@ -33,12 +33,17 @@ class ANB:
             'mean_metric':[],
             'std_metric':[]
         }
+<<<<<<< HEAD
         if self.opt.UNET:
             self.create_D = define_D
             self.create_G = define_G
         else:
             self.create_D = Discriminator
             self.create_G = Generator
+=======
+        self.create_D = Discriminator
+        self.create_G = Generator
+>>>>>>> 6a6789bb943c957f9dc8fcc5fd499dea3ce28b46
         if self.opt.phase == 'train':
             # TODO: initialize network and optimizer
             self.generator_setup()

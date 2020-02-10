@@ -33,7 +33,11 @@ class Options():
         self.parser.add_argument('--ngf', type=int, default=64)
         self.parser.add_argument('--ndf', type=int, default=64)
         self.parser.add_argument('--extralayers', type=int, default=0, help='Number of extra layers on gen and disc')
+<<<<<<< HEAD
         # self.parser.add_argument('--device', type=str, default='gpu', help='Device: gpu | cpu')
+=======
+        self.parser.add_argument('--device', type=str, default='gpu', help='Device: gpu | cpu')
+>>>>>>> 6a6789bb943c957f9dc8fcc5fd499dea3ce28b46
         self.parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
         self.parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
         self.parser.add_argument('--name', type=str, default='unpervised_0_0.1', help='name of the experiment')
