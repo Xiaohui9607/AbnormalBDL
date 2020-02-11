@@ -53,6 +53,7 @@ class Options():
         self.parser.add_argument('--save_weight', action='store_true', default=False, help='Save weight in each iteration')
         self.parser.add_argument('--arch', default='DCGAN', help='DCGAN | UNET')
         self.parser.add_argument('--setting', default='mxn', help='mxn | mpairs')
+        self.parser.add_argument('--use_2disc', action='store_true', help='Use two discriminator')
         ##
         # Train
         self.parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')

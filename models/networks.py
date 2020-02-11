@@ -164,9 +164,9 @@ class Discriminator(nn.Module):
     def __init__(self, opt):
         super(Discriminator, self).__init__()
         self.feat = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-        # layers = list(model.main.children())
-        #
-        # self.features = nn.Sequential(*layers[:-1])
+        self.use_2disc = opt.use_2disc
+        if self.use_2disc:
+            self.extractor = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
         self.classifier = nn.Sequential()
         self.classifier.add_module('classifier', nn.Conv2d(opt.nz, 1, 3, 1, 1, bias=False))
         self.classifier.add_module('Sigmoid', nn.Sigmoid())
@@ -175,7 +175,8 @@ class Discriminator(nn.Module):
         features = self.feat(x)
         classifier = self.classifier(features)
         classifier = classifier.view(-1, 1).squeeze(1)
-
+        if self.use_2disc:
+            features = self.extractor(x)
         return classifier, features
 
 def init_net(net, init_type='normal', gpu_ids=[]):
