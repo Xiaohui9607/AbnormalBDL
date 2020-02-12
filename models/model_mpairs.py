@@ -33,13 +33,13 @@ class model_mpairs(ANBase):
             self.optimizer_Ds.append(optimizer_D)
 
     def train_epoch(self, epoch):
-        for _ in tqdm(range(len(self.dataloader["gen"][0].train)), leave=False,
-                          total=len(self.dataloader["gen"][0].train)):
+        for _ in tqdm(range(len(self.dataloader[0].train)), leave=False,
+                          total=len(self.dataloader[0].train)):
             self.global_iter += 1
 
             # TODO update each disc with all gens
             for _idx in range(self.opt.n_MC_Gen):
-                x_real, _ = next(iter(self.dataloader["gen"][_idx].train))
+                x_real, _ = next(iter(self.dataloader[_idx].train))
                 x_real = x_real.to(self.device)
                 # TODO: optimize net_D
                 self.net_Ds[_idx].zero_grad()
@@ -76,14 +76,14 @@ class model_mpairs(ANBase):
         with torch.no_grad():
             self.opt.phase = 'test'
             means = torch.empty(
-                size=(len(self.dataloader["gen"][0].valid.dataset), self.opt.n_MC_Gen),
+                size=(len(self.dataloader[0].valid.dataset), self.opt.n_MC_Gen),
                 dtype=torch.float32,
                 device=self.device)
 
-            gt_labels = torch.zeros(size=(len(self.dataloader["gen"][0].valid.dataset),),
+            gt_labels = torch.zeros(size=(len(self.dataloader[0].valid.dataset),),
                                     dtype=torch.long, device=self.device)
 
-            for _idxData, (x_real, label) in enumerate(self.dataloader["gen"][0].valid, 0):
+            for _idxData, (x_real, label) in enumerate(self.dataloader[0].valid, 0):
                 x_real = x_real.to(self.device)
 
                 gt_labels[_idxData * self.opt.batchsize: _idxData * self.opt.batchsize + label.size(0)] = label
