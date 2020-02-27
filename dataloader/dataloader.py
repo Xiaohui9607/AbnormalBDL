@@ -49,7 +49,7 @@ def load_data(opt):
 
         train_ds = CIFAR10(root='./data', train=True, download=True, transform=transform)
         valid_ds = CIFAR10(root='./data', train=False, download=True, transform=transform)
-        # train_ds, valid_ds = get_cifar_anomaly_dataset(train_ds, valid_ds, train_ds.class_to_idx[opt.abnormal_class])
+        train_ds, valid_ds = get_cifar_anomaly_dataset(train_ds, valid_ds, train_ds.class_to_idx[opt.abnormal_class])
 
     ## MNIST
     elif opt.dataset in ['mnist']:
