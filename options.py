@@ -19,7 +19,7 @@ class Options():
 
         ##
         # Base
-        self.parser.add_argument('--dataset', default='mnist', help='folder | cifar10 | mnist | OCT')
+        self.parser.add_argument('--dataset', default='cifar10', help='folder | cifar10 | mnist | OCT')
         self.parser.add_argument('--dataroot', default='', help='path to dataset')        
         self.parser.add_argument('--path', default='', help='path to the folder or image to be predicted.')
 
@@ -28,13 +28,12 @@ class Options():
         self.parser.add_argument('--workers', type=int, help='number of data loading workers', default=8)
         self.parser.add_argument('--droplast', action='store_true', default=True, help='Drop last batch size.')
         self.parser.add_argument('--isize', type=int, default=32, help='input image size.')
-        self.parser.add_argument('--nc', type=int, default=1, help='input image channels')
-        self.parser.add_argument('--nz', type=int, default=16, help='size of the latent z vector')
+        self.parser.add_argument('--nc', type=int, default=3, help='input image channels')
+        self.parser.add_argument('--nz', type=int, default=32, help='size of the latent z vector')
         self.parser.add_argument('--ngf', type=int, default=64)
         self.parser.add_argument('--ndf', type=int, default=64)
         self.parser.add_argument('--extralayers', type=int, default=0, help='Number of extra layers on gen and disc')
-        self.parser.add_argument('--device', type=str, default='gpu', help='Device: gpu | cpu')
-        self.parser.add_argument('--gpu_ids', type=str, default='0' if torch.cuda.is_available() else '-1', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+        self.parser.add_argument('--device', type=str, default='gpu' if torch.cuda.is_available() else 'cpu', help='Device: gpu | cpu')
         self.parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
         self.parser.add_argument('--name', type=str, default='exp', help='name of the experiment')
         self.parser.add_argument('--model', type=str, default='abnomalGAN', help='chooses which model to use. ganomaly')
@@ -45,7 +44,7 @@ class Options():
         self.parser.add_argument('--verbose', action='store_true', help='Print the training and model details.')
         self.parser.add_argument('--outf', default='./output', help='folder to output images and model checkpoints')
         self.parser.add_argument('--manualseed', default=-1, type=int, help='manual seed')
-        self.parser.add_argument('--abnormal_class', default='0', help='Anomaly class idx for mnist and cifar datasets')
+        self.parser.add_argument('--abnormal_class', default='automobile', help='Anomaly class idx for mnist and cifar datasets')
         self.parser.add_argument('--metric', type=str, default='roc', help='Evaluation metric: roc | auprc')
         self.parser.add_argument('--bayes', action='store_true', default=False, help='Drop last batch size.')
         self.parser.add_argument('--n_MC_Gen', type=int, default=3, help='number of Generator parameters')
@@ -83,18 +82,6 @@ class Options():
         """
         self.opt, _ = self.parser.parse_known_args()
         self.opt.isTrain = self.isTrain   # train or test
-
-        str_ids = self.opt.gpu_ids.split(',')
-        self.opt.gpu_ids = []
-        for str_id in str_ids:
-            id = int(str_id)
-            if id >= 0:
-                self.opt.gpu_ids.append(id)
-
-        # set gpu ids
-        if len(self.opt.gpu_ids) > 0:
-            torch.cuda.set_device(self.opt.gpu_ids[0])
-
         args = vars(self.opt)
 
         if self.opt.verbose:

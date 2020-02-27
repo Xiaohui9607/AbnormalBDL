@@ -22,3 +22,4 @@
 #python train.py --name M_pairs_7 --abnormal_class 7
 #python train.py --name M_pairs_8 --abnormal_class 8
 #python train.py --name M_pairs_9 --abnormal_class 9
+

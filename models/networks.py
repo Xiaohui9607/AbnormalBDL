@@ -179,6 +179,29 @@ class Discriminator(nn.Module):
             features = self.extractor(x)
         return classifier, features
 
+
+class Discriminator_Deepem(nn.Module):
+    def __init__(self, opt):
+        super(Discriminator_Deepem, self).__init__()
+        self.feat = Encoder(opt.isize, opt.nz*2, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.nz = opt.nz
+        self.use_2disc = opt.use_2disc
+        if self.use_2disc:
+            self.extractor = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.classifier = nn.Sequential()
+        self.classifier.add_module('classifier', nn.Conv2d(opt.nz, 1, 3, 1, 1, bias=False))
+        self.classifier.add_module('Sigmoid', nn.Sigmoid())
+
+
+    def forward(self, x):
+        features = self.feat(x)
+        mean, sigma = features[:, :self.nz, ...], features[:, self.nz:, ...]
+        classifier = self.classifier(mean)
+        classifier = classifier.view(-1, 1).squeeze(1)
+        if self.use_2disc:
+            features = self.extractor(x)
+        return classifier, mean, sigma
+
 def init_net(net, init_type='normal', gpu_ids=[]):
     if len(gpu_ids) > 0:
         assert (torch.cuda.is_available())

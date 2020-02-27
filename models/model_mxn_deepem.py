@@ -44,7 +44,7 @@ class model_mxn(ANBase):
                 x_real = x_real.to(self.device)
                 self.net_Ds[_idxD].zero_grad()
                 label_real = torch.ones(x_real.shape[0]).to(self.device)        # create real label
-                pred_real, feat_real = self.net_Ds[_idxD](x_real)               # get real prediction from network D
+                pred_real, feat_real_mean, feat_real_var = self.net_Ds[_idxD](x_real)               # get real prediction from network D
                 err_d_real = self.l_adv(pred_real, label_real)
 
                 err_d_fakes = 0.0
@@ -52,11 +52,13 @@ class model_mxn(ANBase):
 
                 for _idxG in range(self.opt.n_MC_Gen):
                     x_fake = self.net_Gs[_idxG](x_real)                         # get fake image from network G
-                    pred_fake, feat_fake = self.net_Ds[_idxD](x_fake.detach())  # get fake prediction from network D
+                    pred_fake, feat_fake_mean, _ = self.net_Ds[_idxD](x_fake.detach())  # get fake prediction from network D
                     label_fake = torch.zeros(x_real.shape[0]).to(self.device)
 
                     err_d_fake = self.l_adv(pred_fake, label_fake)
-                    err_d_lat = self.l_lat(feat_real, feat_fake)
+                    # TODO: rewrite latent loss with scoring function with sigma
+                    err_d_lat = None
+                    # err_d_lat = self.l_lat(feat_real, feat_fake)
 
                     err_d_fakes += err_d_fake
                     err_d_lats += err_d_lat
@@ -79,7 +81,7 @@ class model_mxn(ANBase):
                 err_g_fakes = 0.0
 
                 for _idxD in range(self.opt.n_MC_Disc):
-                    pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)           # get fake prediction from network D
+                    pred_fake, feat_fake, _ = self.net_Ds[_idxD](x_fake)           # get fake prediction from network D
                     label_real = torch.ones(x_real.shape[0]).to(self.device)    # create inversed label
 
                     err_g_fake = self.l_adv(pred_fake, label_real)
@@ -102,7 +104,8 @@ class model_mxn(ANBase):
             gt_labels = torch.zeros(size=(len(self.dataloader["gen"][0].valid.dataset),),
                                     dtype=torch.long, device=self.device)
 
-            for _idxData, (x_real, label) in enumerate(self.dataloader["gen"][0].valid, 0):
+            for _idxData, (x_real, label) in tqdm(enumerate(self.dataloader["gen"][0].valid, 0), leave=False,
+                                                  total=len(self.dataloader["gen"][0].valid)):
                 x_real = x_real.to(self.device)
 
                 gt_labels[_idxData * self.opt.batchsize: _idxData * self.opt.batchsize + label.size(0)] = label

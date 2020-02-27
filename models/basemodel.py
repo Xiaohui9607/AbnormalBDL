@@ -23,7 +23,7 @@ class ANBase:
         self.opt.batchsize //= self.opt.split
         self.epoch = self.opt.niter
         self.visualizer = Visualizer(self.opt)
-        self.device = 'cpu' if not self.opt.gpu_ids else 'cuda'
+        self.device = opt.device
         self.global_iter = 0
 
         self.dataloader_setup()
@@ -83,11 +83,11 @@ class ANBase:
         self.net_Ds = []
         for weight in pathlist['net_G']:
             net_G = Generator(self.opt).to(self.device)
-            net_G.load_state_dict(torch.load(weight))
+            net_G.load_state_dict(torch.load(weight, map_location=self.device))
             self.net_Gs.append(net_G)
         for weight in pathlist['net_D']:
             net_D = Discriminator(self.opt).to(self.device)
-            net_D.load_state_dict(torch.load(weight))
+            net_D.load_state_dict(torch.load(weight, map_location=self.device))
             self.net_Ds.append(net_D)
 
     def get_best_result(self, metric):
