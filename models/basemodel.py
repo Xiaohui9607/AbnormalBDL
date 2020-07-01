@@ -8,7 +8,7 @@ from models.evaluate import roc
 from collections import OrderedDict
 from utils import Visualizer
 from dataloader.dataloader import load_data
-from models.networks import Generator, Discriminator, define_D, define_G
+from models.networks import Generator, Discriminator, define_D, define_G, MLP_Discriminator, MLP_Generator
 from utils.loss import lat_loss, con_loss
 from utils import weights_init
 
@@ -27,12 +27,16 @@ class ANBase:
         self.global_iter = 0
 
         self.dataloader_setup()
-        if self.opt.arch == 'DCGAN':
-            self.create_D = Discriminator
-            self.create_G = Generator
+        if self.opt.dataset == 'KDD99':
+            self.create_D = MLP_Discriminator
+            self.create_G = MLP_Generator
         else:
-            self.create_D = define_D
-            self.create_G = define_G
+            if self.opt.arch == 'DCGAN':
+                self.create_D = Discriminator
+                self.create_G = Generator
+            else:
+                self.create_D = define_D
+                self.create_G = define_G
         if self.opt.phase == 'train':
             # TODO: initialize network and optimizer
             self.generator_setup()

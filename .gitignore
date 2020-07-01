@@ -8,6 +8,9 @@ output/*
 __pycache__/
 *.py[cod]
 */__pycache__/
+plane_as_abn_cls_all_info/*
+app/*
+
 
 # C extensions
 *.so

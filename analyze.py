@@ -5,24 +5,40 @@
 
 from options import Options, setup_dir
 from models.model_mxn import model_mxn
-
-
+from models.model_mpairs import model_mpairs
+import argparse
+import glob, os
 def main():
     """ Training
     """
-    opt = Options().parse()
-    setup_dir(opt)
-    model = model_mxn(opt)
-    path = '/Users/golf/code/Abnormal_result/Abnormal_result/cifar/M_N/mxn_automobile_1/train/weights/'
-    weight_path = {
-        'net_G':[path+'Net_G_0_epoch_2.pth', path+'Net_G_1_epoch_2.pth', path+'Net_G_2_epoch_2.pth'],
-        'net_D':[path+'Net_D_0_epoch_2.pth', path+'Net_D_1_epoch_2.pth', path+'Net_D_2_epoch_2.pth']
-    }
-    model.load_weight(weight_path)
+    path = '/mnt/AbnormalResult/'
 
-    gt_label, pred = model.test_epoch(0)
-    gt_label[gt_label not in [1, 9]] =0
+    exps = [os.path.join(path, '1_cifar/1_pairs_airplane_2/train')]
+
+    for exp in exps:
+        optfile = os.path.join(exp, 'opt.txt')
+        opt = Options().parse_from_file(optfile)
+        opt.batchsize = 64
+        if opt.setting == 'mxn':
+            model = model_mxn(opt)
+        else:
+            model = model_mpairs(opt)
+        for iter in range(opt.niter):
+            weight_path = {
+                'net_G': sorted(glob.glob(os.path.join(exp, 'weights', 'Net_G*_epoch_%d.pth*'%iter))),
+                'net_D': sorted(glob.glob(os.path.join(exp, 'weights', 'Net_D*_epoch_%d.pth*'%iter)))
+            }
+            if len(weight_path['net_D']) != opt.n_MC_Disc and len(weight_path['net_G']) != opt.n_MC_Gen:
+                continue
+            try:
+                model.load_weight(weight_path)
+            except:
+                continue
+            print("{}_{}".format(opt.name, iter))
+            model.compute_epoch(iter)
 
 
 if __name__ == '__main__':
     main()
+    # parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    # parser.parse_known_args()

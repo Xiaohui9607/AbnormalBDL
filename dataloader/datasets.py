@@ -6,6 +6,10 @@ CREATE DATASETS
 
 import torch.utils.data as data
 import torch
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import Normalizer
+
 from random import shuffle
 from torchvision.datasets import DatasetFolder
 
@@ -177,10 +181,10 @@ def get_cifar_anomaly_dataset(train_ds, valid_ds, abn_cls_idx=0):
 
     # --
     # Assign labels to normal (0) and abnormals (1)
-    nrm_trn_lbl[:] = 0
-    nrm_tst_lbl[:] = 0
-    abn_trn_lbl[:] = 1
-    abn_tst_lbl[:] = 1
+    # nrm_trn_lbl[:] = 0
+    # nrm_tst_lbl[:] = 0
+    # abn_trn_lbl[:] = 1
+    # abn_tst_lbl[:] = 1
 
     # Create new anomaly dataset based on the following data structure:
     # - anomaly dataset
@@ -194,6 +198,10 @@ def get_cifar_anomaly_dataset(train_ds, valid_ds, abn_cls_idx=0):
     train_ds.targets = np.copy(nrm_trn_lbl)
     valid_ds.targets = np.concatenate((nrm_tst_lbl, abn_trn_lbl, abn_tst_lbl), axis=0)
 
+    # train_ds.data = np.copy(trn_img)
+    # valid_ds.data = np.copy(tst_img)
+    # train_ds.targets = np.copy(trn_lbl)
+    # valid_ds.targets = np.copy(tst_lbl)
     return train_ds, valid_ds
 
 ##
@@ -247,7 +255,7 @@ def get_mnist_anomaly_dataset(train_ds, valid_ds, abn_cls_idx=0):
     valid_ds.targets = torch.cat((nrm_tst_lbl, abn_trn_lbl, abn_tst_lbl), dim=0)
 
     return train_ds, valid_ds
-
+#
 ##
 def make_anomaly_dataset(train_ds, valid_ds, abn_cls_idx=0):
     """[summary]
@@ -310,3 +318,7 @@ def make_anomaly_dataset(train_ds, valid_ds, abn_cls_idx=0):
     valid_ds.targets = torch.cat((nrm_tst_lbl, abn_trn_lbl, abn_tst_lbl), dim=0)
 
     return train_ds, valid_ds
+
+#
+# if __name__ == '__main__':
+#     get_kdd_anomaly_dataset("../data/KDD99/kddtrain.csv","../data/KDD99/kddtest.csv")

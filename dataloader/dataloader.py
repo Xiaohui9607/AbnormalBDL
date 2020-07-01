@@ -11,9 +11,11 @@ from torchvision import transforms
 from torchvision.transforms import functional as F
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST, CIFAR10, ImageFolder
+
 from dataloader.datasets import get_cifar_anomaly_dataset
 from dataloader.datasets import get_mnist_anomaly_dataset
-
+# from dataloader.kdd_dataset import get_loader
+from dataloader.kdd import KDD_dataset
 
 class Data:
     """ Dataloader containing train and valid sets.
@@ -62,7 +64,6 @@ def load_data(opt):
         train_ds, valid_ds = get_mnist_anomaly_dataset(train_ds, valid_ds, int(opt.abnormal_class))
 
     # FOLDER
-
     elif opt.dataset in ['OCT']:
         # TODO: fix the OCT dataset into the dataloader and return
         def white_noise(x):
@@ -70,7 +71,6 @@ def load_data(opt):
             x[x > 1] = 1
             x[x < 0] = 0
             return x
-
         transform_train = transforms.Compose([
             transforms.Grayscale(),
             transforms.Resize(opt.isize),
@@ -80,7 +80,6 @@ def load_data(opt):
             transforms.ToTensor(),
             transforms.Lambda(white_noise)])
 
-
         transform_test = transforms.Compose([
             transforms.Grayscale(),
             transforms.Resize(opt.isize),
@@ -89,6 +88,10 @@ def load_data(opt):
 
         train_ds = ImageFolder(os.path.join(opt.dataroot, 'train'), transform_train)
         valid_ds = ImageFolder(os.path.join(opt.dataroot, 'test'), transform_test)
+
+    elif opt.dataset in ['KDD99']:
+        train_ds = KDD_dataset(opt, mode='train')
+        valid_ds = KDD_dataset(opt, mode='test')
 
     else:
         raise NotImplementedError

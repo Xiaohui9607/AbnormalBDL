@@ -91,6 +91,102 @@ class model_mxn(ANBase):
                 err_g_total_loss.backward()
                 self.optims['gen'][_idxG].step()
 
+    def compute_epoch(self, epoch, plot_hist=True):
+        with torch.no_grad():
+            self.opt.phase = 'test'
+
+            means_test = torch.empty(
+                size=(len(self.dataloader["gen"][0].train.dataset), self.opt.n_MC_Gen, self.opt.n_MC_Disc),
+                dtype=torch.float32,
+                device=self.device)
+
+            gt_labels_test = torch.zeros(size=(len(self.dataloader["gen"][0].train.dataset),),
+                                    dtype=torch.long, device=self.device)
+
+            fake_latents_test = torch.empty(
+                size=(len(self.dataloader["gen"][0].train.dataset), self.opt.n_MC_Gen, self.opt.n_MC_Disc, self.opt.nz),
+                dtype=torch.float32,
+                device=self.device)
+            real_latents_test = torch.empty(
+                size=(len(self.dataloader["gen"][0].train.dataset), self.opt.n_MC_Gen, self.opt.nz),
+                dtype=torch.float32,
+                device=self.device)
+            for _idxData, (x_real, label) in enumerate(self.dataloader["gen"][0].train, 0):
+                x_real = x_real.to(self.device)
+
+                gt_labels_test[_idxData * self.opt.batchsize: _idxData * self.opt.batchsize + label.size(0)].copy_(label)
+                for _idxD in range(self.opt.n_MC_Disc):
+                    pred_real, feat_real = self.net_Ds[_idxD](x_real)
+                    real_latents_test[_idxData * self.opt.batchsize:(_idxData + 1) * self.opt.batchsize, _idxD].copy_(feat_real.squeeze())
+                    for _idxG in range(self.opt.n_MC_Gen):
+                        x_fake = self.net_Gs[_idxG](x_real)
+                        pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
+
+                        fake_latents_test[_idxData * self.opt.batchsize:(_idxData + 1) * self.opt.batchsize, _idxG, _idxD].copy_(feat_fake.squeeze())
+                        lat = (feat_real - feat_fake).view(feat_real.size()[0], -1)
+                        # latents[_idxData * self.opt.batchsize:(_idxData + 1) * self.opt.batchsize, _idxG, _idxD].copy_(lat)
+
+                        lat = torch.mean(torch.pow(lat, 2), dim=1)
+
+                        means_test[_idxData * self.opt.batchsize:(_idxData + 1) * self.opt.batchsize, _idxG, _idxD].copy_(
+                            lat)
+
+            # fake_latents_test = torch.mean(fake_latents_test, dim=[1,2])
+            # real_latents_test = torch.mean(real_latents_test, dim=1)
+            # means_test= torch.mean(means_test, dim=[1, 2])
+
+            means_test = means_test.cpu().numpy()
+            fake_latents_test = fake_latents_test.cpu().numpy()
+            real_latents_test = real_latents_test.cpu().numpy()
+
+            scores = {}
+            scores['mean'] = means_test
+            scores['fake_latents'] = fake_latents_test
+            scores['real_latents'] = real_latents_test
+            scores['gt_labels'] = gt_labels_test.cpu().numpy()
+            abnidx = self.dataloader["gen"][0].train.dataset.class_to_idx[self.opt.abnormal_class]
+            import numpy as np
+            np.save("{0}exp_{1}epoch_{2}abnidx_score_train.npy".format(self.opt.name, epoch, abnidx),scores)
+
+            # if plot_hist:
+            #     abnidx = self.dataloader["gen"][0].train.dataset.class_to_idx[self.opt.abnormal_class]
+            #     plt.ion()
+            #     # Create data frame for scores and labels.
+            #     # scores = {}
+            #     # scores['scores'] = means_train
+            #     # scores['labels'] = gt_labels_train.cpu()
+            #     # hist = pd.DataFrame.from_dict(scores)
+            #     # hist.to_csv("{0}exp_{1}epoch_{2}abnidx_score_train.csv".format(self.opt.name, epoch, abnidx))
+            #
+            #     scores = {}
+            #     scores['scores'] = means_test
+            #     scores['labels'] = gt_labels_test.cpu()
+            #     hist = pd.DataFrame.from_dict(scores)
+            #     hist.to_csv("{0}exp_{1}epoch_{2}abnidx_score_test.csv".format(self.opt.name, epoch, abnidx))
+            #
+            # #     # Create data frame for scores and labels.
+            #     hiddens = {}
+            #     for dim in range(real_latents_test.shape[1]):
+            #         hiddens['real_latent_%d'%dim] = real_latents_test[:, dim]
+            #     hiddens['labels'] = gt_labels_test.cpu()
+            #     hist = pd.DataFrame.from_dict(hiddens)
+            #     hist.to_csv("{0}exp_{1}epoch_{2}abnidx_real_latent_test.csv".format(self.opt.name, epoch, abnidx))
+            # #
+            #     hiddens = {}
+            #     for dim in range(fake_latents_test.shape[1]):
+            #         hiddens['fake_latent_%d'%dim] = fake_latents_test[:, dim]
+            #     hiddens['labels'] = gt_labels_test.cpu()
+            #     hist = pd.DataFrame.from_dict(hiddens)
+            #     hist.to_csv("{0}exp_{1}epoch_{2}abnidx_fake_latent_test.csv".format(self.opt.name, epoch, abnidx))
+
+            #     plt.ion()
+            #     # Create data frame for scores and labels.
+            #     scores = {}
+            #     scores['scores'] = means
+            #     scores['labels'] = gt_labels.cpu()
+            #     hist = pd.DataFrame.from_dict(scores)
+            #     hist.to_csv("{0}/{1}/test/plots/mean_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
+
     def test_epoch(self, epoch, plot_hist=True):
         with torch.no_grad():
             self.opt.phase = 'test'
@@ -102,56 +198,50 @@ class model_mxn(ANBase):
             gt_labels = torch.zeros(size=(len(self.dataloader["gen"][0].valid.dataset),),
                                     dtype=torch.long, device=self.device)
 
+            fake_latents = torch.empty(
+                size=(len(self.dataloader["gen"][0].valid.dataset), self.opt.n_MC_Gen, self.opt.n_MC_Disc, self.opt.nz),
+                dtype=torch.float32,
+                device=self.device)
+            real_latents = torch.empty(
+                size=(len(self.dataloader["gen"][0].valid.dataset), self.opt.n_MC_Disc, self.opt.nz),
+                dtype=torch.float32,
+                device=self.device)
             for _idxData, (x_real, label) in enumerate(self.dataloader["gen"][0].valid, 0):
                 x_real = x_real.to(self.device)
 
-                gt_labels[_idxData * self.opt.batchsize: _idxData * self.opt.batchsize + label.size(0)] = label
+                gt_labels[_idxData * self.opt.batchsize: _idxData * self.opt.batchsize + label.size(0)].copy_(label)
                 for _idxD in range(self.opt.n_MC_Disc):
                     pred_real, feat_real = self.net_Ds[_idxD](x_real)
+                    real_latents[_idxData * self.opt.batchsize:(_idxData + 1) * self.opt.batchsize, _idxD].copy_(feat_real.squeeze())
                     for _idxG in range(self.opt.n_MC_Gen):
                         x_fake = self.net_Gs[_idxG](x_real)
                         pred_fake, feat_fake = self.net_Ds[_idxD](x_fake)
 
+                        fake_latents[_idxData * self.opt.batchsize:(_idxData + 1) * self.opt.batchsize, _idxG, _idxD].copy_(feat_fake.squeeze())
                         lat = (feat_real - feat_fake).view(feat_real.size()[0], -1)
+                        # latents[_idxData * self.opt.batchsize:(_idxData + 1) * self.opt.batchsize, _idxG, _idxD].copy_(lat)
 
                         lat = torch.mean(torch.pow(lat, 2), dim=1)
 
                         means[_idxData * self.opt.batchsize:(_idxData + 1) * self.opt.batchsize, _idxG, _idxD].copy_(
                             lat)
 
-            vars_D_based = torch.var(means, dim=1, keepdim=True)
             means_D_based = torch.mean(means, dim=1, keepdim=True)
-            vars_D_based = torch.mean(vars_D_based + torch.pow(means_D_based, 2), dim=2)
 
             means = torch.mean(means_D_based, dim=2)
 
-            vars = vars_D_based - torch.pow(means, 2)
-
             means = means.cpu().squeeze()
-            vars = vars.cpu().squeeze()
-
-            per_scores = means
-            per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
-            roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
-                                                                                  "test/plots/mean_at_epoch{0}.png".format(
-                                                                                      epoch)))
-            per_scores = torch.sqrt(vars)
-            per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
-            roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
-                                                                                "test/plots/var_at_epoch{0}.png".format(
-                                                                                    epoch)))
-            # PLOT HISTOGRAM
             if plot_hist:
+                per_scores = means
+                per_scores = (per_scores - torch.min(per_scores)) / (torch.max(per_scores) - torch.min(per_scores))
+                roc(gt_labels, per_scores, epoch=epoch, save=os.path.join(self.opt.outf, self.opt.name,
+                                                                                      "test/plots/mean_at_epoch{0}.png".format(
+                                                                                          epoch)))
+                # abnidx = self.dataloader["gen"][0].train.dataset.class_to_idx[self.opt.abnormal_class]
                 plt.ion()
                 # Create data frame for scores and labels.
                 scores = {}
                 scores['scores'] = means
                 scores['labels'] = gt_labels.cpu()
                 hist = pd.DataFrame.from_dict(scores)
-                hist.to_csv("{0}/{1}/test/plots/mean_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
-
-                re_var = {}
-                re_var['var'] = vars
-                re_var['labels'] = gt_labels.cpu()
-                hist_v = pd.DataFrame.from_dict(re_var)
-                hist_v.to_csv("{0}/{1}/test/plots/var_at_epoch{2}.csv".format(self.opt.outf, self.opt.name, epoch))
+                hist.to_csv(os.path.join(self.opt.outf, self.opt.name, "{0}exp_{1}epoch_score_train.csv".format(self.opt.name, epoch)))

@@ -159,14 +159,10 @@ class Generator(nn.Module):
     def forward(self, x):
         return self.decoder(self.encoder(x))
 
-
 class Discriminator(nn.Module):
     def __init__(self, opt):
         super(Discriminator, self).__init__()
         self.feat = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
-        self.use_2disc = opt.use_2disc
-        if self.use_2disc:
-            self.extractor = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
         self.classifier = nn.Sequential()
         self.classifier.add_module('classifier', nn.Conv2d(opt.nz, 1, 3, 1, 1, bias=False))
         self.classifier.add_module('Sigmoid', nn.Sigmoid())
@@ -175,32 +171,29 @@ class Discriminator(nn.Module):
         features = self.feat(x)
         classifier = self.classifier(features)
         classifier = classifier.view(-1, 1).squeeze(1)
-        if self.use_2disc:
-            features = self.extractor(x)
-        return classifier, features
 
+        return classifier, features
 
 class Discriminator_Deepem(nn.Module):
     def __init__(self, opt):
         super(Discriminator_Deepem, self).__init__()
-        self.feat = Encoder(opt.isize, opt.nz*2, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.feat = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
         self.nz = opt.nz
-        self.use_2disc = opt.use_2disc
-        if self.use_2disc:
-            self.extractor = Encoder(opt.isize, opt.nz, opt.nc, opt.ngf, opt.ngpu, opt.extralayers)
+        self.dropout = nn.Dropout()
         self.classifier = nn.Sequential()
+        # self.classifier.add_module('dropout', nn.Dropout(0.5))
         self.classifier.add_module('classifier', nn.Conv2d(opt.nz, 1, 3, 1, 1, bias=False))
         self.classifier.add_module('Sigmoid', nn.Sigmoid())
 
 
-    def forward(self, x):
-        features = self.feat(x)
-        mean, sigma = features[:, :self.nz, ...], features[:, self.nz:, ...]
-        classifier = self.classifier(mean)
+    def forward(self, x, dropout=None):
+        features = self.feat(x).squeeze()
+        if dropout is None:
+            features = self.dropout(features)
+
+        classifier = self.classifier(features)
         classifier = classifier.view(-1, 1).squeeze(1)
-        if self.use_2disc:
-            features = self.extractor(x)
-        return classifier, mean, sigma
+        return classifier, features
 
 def init_net(net, init_type='normal', gpu_ids=[]):
     if len(gpu_ids) > 0:
@@ -232,3 +225,51 @@ def init_weights(net, init_type='normal', gain=0.02):
             init.constant_(m.bias.data, 0.0)
 
     net.apply(init_func)
+
+class MLP_Generator(nn.Module):
+    def __init__(self, opt):
+        super(MLP_Generator, self).__init__()
+        self.encoder = nn.Sequential(nn.Linear(122,64),
+                                     nn.Tanh(),
+                                     nn.Linear(64, 32),
+                                     nn.Tanh(),
+                                     nn.Linear(32, 16))
+                                     # nn.Tanh(),
+                                     # nn.Linear(16, 8))
+        self.decoder = nn.Sequential(#nn.Linear(8,16),
+                                     #nn.Tanh(),
+                                     nn.Linear(16, 32),
+                                     nn.Tanh(),
+                                     nn.Linear(32, 64),
+                                     nn.Tanh(),
+                                     nn.Linear(64, 122))
+    def forward(self, x):
+        feature = self.encoder(x)
+        ret = self.decoder(feature)
+        return ret
+
+
+class MLP_Discriminator(nn.Module):
+    def __init__(self, opt):
+        super(MLP_Discriminator, self).__init__()
+        self.encoder = nn.Sequential(nn.Linear(122,64),
+                                     nn.Tanh(),
+                                     nn.Linear(64, 32),
+                                     nn.Tanh(),
+                                     nn.Linear(32, 16),
+                                     # nn.Tanh(),
+                                     # nn.Linear(16),
+                                     nn.Tanh())
+        self.classifier = nn.Sequential(nn.Linear(16,1),
+                                        nn.Sigmoid())
+    def forward(self, x):
+        feature = self.encoder(x)
+        ret = self.classifier(feature)
+        return  ret, feature
+
+# if __name__ == '__main__':
+#     x = torch.ones(64, 118)
+#     G = MLP_Generator()
+#     D = MLP_Discriminator()
+#     cls = D(x)
+#     pass

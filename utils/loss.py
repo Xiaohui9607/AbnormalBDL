@@ -32,3 +32,9 @@ class lat_loss(nn.Module):
             return torch.mean(torch.pow(x-target, 2)) * 1/torch.pow(self.sigma, 2)
         else:
             return torch.pow(x-target, 2) * 1/torch.pow(self.sigma, 2)
+
+def guassian_nll(y_real, y_mu, rho, predict=False):
+    var = torch.log(1+torch.exp(rho))
+    if predict:
+        return torch.sum(torch.pow(y_real-y_mu, 2) / var, dim=1).squeeze()
+    return torch.sum(torch.pow(y_real-y_mu, 2) / var)

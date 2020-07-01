@@ -7,6 +7,7 @@ from options import Options, setup_dir
 from models.basemodel import ANBase
 from models.model_mxn import model_mxn
 from models.model_mpairs import model_mpairs
+# from models.model_mxn_deepem import model_mxn_deepem
 ##
 def main():
     """ Training
@@ -18,6 +19,7 @@ def main():
     elif opt.setting == "mpairs":
         model = model_mpairs(opt)
     model.train()
+
 
 
 
